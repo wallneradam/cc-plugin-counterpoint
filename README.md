@@ -30,14 +30,11 @@ Requires [Codex CLI](https://github.com/openai/codex):
 npm install -g @openai/codex
 ```
 
-Install the plugin into Claude Code:
+Register the marketplace and install the plugin (run these inside Claude Code):
 
-```bash
-# globally — available in all projects
-claude plugin install /path/to/cc-plugin-counterpoint --scope user
-
-# per project — shared via version control
-claude plugin install /path/to/cc-plugin-counterpoint --scope project
+```
+/plugin marketplace add /path/to/cc-plugin-counterpoint
+/plugin install counterpoint@cc-plugin-counterpoint
 ```
 
 ## Usage

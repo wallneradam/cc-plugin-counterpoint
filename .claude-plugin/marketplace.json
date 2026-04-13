@@ -1,0 +1,18 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "cc-plugin-counterpoint",
+  "version": "1.0.0",
+  "description": "Collaborative review and problem-solving plugin pairing Claude with Codex CLI",
+  "owner": {
+    "name": "wallner"
+  },
+  "plugins": [
+    {
+      "name": "counterpoint",
+      "description": "Collaborative review and problem-solving between Claude and Codex CLI",
+      "version": "1.0.0",
+      "source": "./plugin",
+      "category": "development"
+    }
+  ]
+}

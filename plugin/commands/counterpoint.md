@@ -1,6 +1,6 @@
 ---
-description: Start an actor-critic debate about a plan or proposal with Codex
-argument-hint: '[plan or proposal to debate]'
+description: Review and stress-test a concrete plan or proposal with Codex (critique mode)
+argument-hint: '[plan or proposal to review]'
 allowed-tools: Bash(node:*), Read, Glob, Grep
 ---
 
