@@ -33,7 +33,11 @@ npm install -g @openai/codex
 Install the plugin into Claude Code:
 
 ```bash
-claude plugin add /path/to/cc-plugin-counterpoint
+# globally — available in all projects
+claude plugin install /path/to/cc-plugin-counterpoint --scope user
+
+# per project — shared via version control
+claude plugin install /path/to/cc-plugin-counterpoint --scope project
 ```
 
 ## Usage
