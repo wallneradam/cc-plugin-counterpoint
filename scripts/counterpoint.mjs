@@ -10,26 +10,52 @@ const DATA_DIR = process.env.CLAUDE_PLUGIN_DATA || os.tmpdir();
 const THREAD_FILE = path.join(DATA_DIR, `counterpoint-${SESSION_ID}.thread`);
 const RESPONSE_FILE = path.join(DATA_DIR, `counterpoint-${SESSION_ID}-response.txt`);
 const TIMEOUT_MS = 120_000;
+const VALID_EFFORTS = new Set(["none", "minimal", "low", "medium", "high", "xhigh"]);
 
-const CRITIC_PREAMBLE = `You are a rigorous technical critic in an actor-critic debate. Your job is to find weaknesses, unstated assumptions, missing edge cases, and better alternatives in the proposed plan. Be specific and constructive — identify concrete problems and suggest concrete improvements. Do not rubber-stamp. Challenge the approach even if it seems reasonable.
+const CRITIQUE_PREAMBLE = `You are an experienced colleague reviewing a proposal from a trusted teammate. You share the same goal: building the best possible solution together. Approach this as a collaborative review — start by recognizing what is well thought out, then build on it with honest, constructive feedback. Every concern you raise should come with a concrete suggestion for improvement. Your tone should reflect mutual respect: you are helping a peer refine good work, not finding fault.
 
 Structure your response as:
-1. STRONGEST OBJECTION: The single biggest risk or flaw
-2. ALTERNATIVES: Different approaches worth considering
-3. GAPS: Missing considerations
-4. VERDICT: weak/moderate/strong with 1-sentence rationale
+1. STRENGTHS: What works well in this approach — be specific about why it's a good choice
+2. CONCERNS: Issues or risks you see, each paired with a suggested improvement
+3. ALTERNATIVES: Different approaches worth considering, if any — explain the trade-offs fairly
+4. GAPS: Missing considerations that would strengthen the proposal
+5. VERDICT: weak/moderate/strong with 1-sentence rationale
 
 ---
 
-The actor proposes:
+Your colleague proposes:
 
 `;
 
-const FOLLOWUP_PREAMBLE = `The actor has revised their proposal in response to your critique. Re-evaluate. Focus on whether the revisions adequately address your concerns and whether any new issues were introduced. Use the same structure (STRONGEST OBJECTION / ALTERNATIVES / GAPS / VERDICT).
+const CRITIQUE_FOLLOWUP_PREAMBLE = `Your colleague revised the proposal based on your feedback. Re-evaluate as a supportive collaborator. Acknowledge what improved, note any remaining concerns with suggestions, and highlight if any new issues were introduced. You are working toward the same outcome together.
+
+Same structure (STRENGTHS / CONCERNS / ALTERNATIVES / GAPS / VERDICT).
 
 ---
 
 Revised proposal:
+
+`;
+
+const CONSULT_PREAMBLE = `You are an experienced colleague helping a trusted teammate think through a problem. They are exploring options and value your perspective. Think through it together: ask clarifying questions, suggest approaches, weigh trade-offs honestly, and help them build confidence in a well-considered decision. Share your reasoning openly. Be collaborative, not prescriptive — this is a conversation between equals.
+
+Structure your response as:
+1. UNDERSTANDING: Restate the problem as you see it — surface any ambiguity
+2. OPTIONS: Approaches worth considering, with pros/cons for each
+3. RECOMMENDATION: What you would lean toward, and why
+4. OPEN QUESTIONS: What would you want to clarify before committing?
+
+---
+
+Your colleague asks:
+
+`;
+
+const CONSULT_FOLLOWUP_PREAMBLE = `Your colleague is continuing the discussion. Build on what you've explored together so far — acknowledge progress made, and focus on what's still open. Skip parts that are already resolved.
+
+Same structure (UNDERSTANDING / OPTIONS / RECOMMENDATION / OPEN QUESTIONS) where relevant.
+
+---
 
 `;
 
@@ -130,7 +156,12 @@ function runCodex(codexBin, args, promptText) {
   });
 }
 
-async function critique(text) {
+const PREAMBLES = {
+  critique: { initial: CRITIQUE_PREAMBLE, followup: CRITIQUE_FOLLOWUP_PREAMBLE },
+  consult: { initial: CONSULT_PREAMBLE, followup: CONSULT_FOLLOWUP_PREAMBLE },
+};
+
+async function runSession(mode, text, effort) {
   const codexBin = findCodexBin();
   if (!codexBin) {
     console.error("Codex CLI not found. Install with: npm install -g @openai/codex");
@@ -138,9 +169,16 @@ async function critique(text) {
     return;
   }
 
+  if (effort && !VALID_EFFORTS.has(effort)) {
+    console.error(`Invalid effort: "${effort}". Use one of: ${[...VALID_EFFORTS].join(", ")}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const preamble = PREAMBLES[mode];
   const existingThread = readThreadId();
   const isResume = Boolean(existingThread);
-  const prompt = isResume ? FOLLOWUP_PREAMBLE + text : CRITIC_PREAMBLE + text;
+  const prompt = isResume ? preamble.followup + text : preamble.initial + text;
 
   fs.mkdirSync(path.dirname(RESPONSE_FILE), { recursive: true });
 
@@ -151,6 +189,9 @@ async function critique(text) {
     args.push("exec", "-");
   }
   args.push("--json", "--sandbox", "read-only", "--output-last-message", RESPONSE_FILE);
+  if (effort) {
+    args.push("-c", `model_reasoning_effort="${effort}"`);
+  }
 
   let result;
   try {
@@ -162,9 +203,10 @@ async function critique(text) {
         "exec", "-",
         "--json", "--sandbox", "read-only",
         "--output-last-message", RESPONSE_FILE,
+        ...(effort ? ["-c", `model_reasoning_effort="${effort}"`] : []),
       ];
       try {
-        result = await runCodex(codexBin, freshArgs, CRITIC_PREAMBLE + text);
+        result = await runCodex(codexBin, freshArgs, preamble.initial + text);
       } catch (retryErr) {
         console.error(`Codex error: ${retryErr.message}`);
         process.exitCode = 1;
@@ -209,14 +251,31 @@ async function main() {
 
   switch (subcommand) {
     case "critique":
-      const text = rest.join(" ").trim();
+    case "consult": {
+      let effort = null;
+      const filtered = [];
+      for (let i = 0; i < rest.length; i++) {
+        if (rest[i] === "--effort") {
+          if (i + 1 < rest.length) {
+            effort = rest[++i];
+          } else {
+            console.error("--effort requires a value: none, minimal, low, medium, high, xhigh");
+            process.exitCode = 1;
+            return;
+          }
+        } else {
+          filtered.push(rest[i]);
+        }
+      }
+      const text = filtered.join(" ").trim();
       if (!text) {
-        console.error("Usage: counterpoint.mjs critique <proposal text>");
+        console.error(`Usage: counterpoint.mjs ${subcommand} [--effort <level>] <text>`);
         process.exitCode = 1;
         return;
       }
-      await critique(text);
+      await runSession(subcommand, text, effort);
       break;
+    }
     case "status":
       status();
       break;
@@ -224,7 +283,7 @@ async function main() {
       reset();
       break;
     default:
-      console.error("Usage: counterpoint.mjs <critique|status|reset> [args]");
+      console.error("Usage: counterpoint.mjs <critique|consult|status|reset> [args]");
       process.exitCode = 1;
   }
 }

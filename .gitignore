@@ -1,0 +1,11 @@
+node_modules/
+*.thread
+*-response.txt
+.DS_Store
+
+# AI tools
+.claude/
+.cursor/
+CLAUDE.md
+AGENTs.md
+MEMORY.md
