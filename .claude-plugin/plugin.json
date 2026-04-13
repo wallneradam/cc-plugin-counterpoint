@@ -1,0 +1,5 @@
+{
+  "name": "counterpoint",
+  "version": "1.0.0",
+  "description": "Actor-critic debate between Claude and Codex for stress-testing plans"
+}
