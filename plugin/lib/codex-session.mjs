@@ -9,7 +9,7 @@ const DATA_DIR = process.env.CLAUDE_PLUGIN_DATA || os.tmpdir();
 export const THREAD_FILE = path.join(DATA_DIR, `counterpoint-${SESSION_ID}.thread`);
 export const RESPONSE_FILE = path.join(DATA_DIR, `counterpoint-${SESSION_ID}-response.txt`);
 export const AUTO_CONSULT_FILE = path.join(DATA_DIR, `counterpoint-${SESSION_ID}.auto-consult`);
-export const TIMEOUT_MS = 120_000;
+export const TIMEOUT_MS = Number(process.env.COUNTERPOINT_TIMEOUT_MS) || 900_000;
 export const VALID_EFFORTS = new Set(["none", "minimal", "low", "medium", "high", "xhigh"]);
 
 const CRITIQUE_PREAMBLE = `You are an experienced colleague reviewing a proposal from a trusted teammate. You share the same goal: building the best possible solution together. Approach this as a collaborative review — start by recognizing what is well thought out, then build on it with honest, constructive feedback. Every concern you raise should come with a concrete suggestion for improvement. Your tone should reflect mutual respect: you are helping a peer refine good work, not finding fault.
@@ -166,8 +166,9 @@ function runCodex(codexBin, args, promptText) {
 
     child.on("close", (code) => {
       clearTimeout(timer);
-      if (code !== 0 && !threadId) {
-        reject(new Error(stderr.trim() || `Codex exited with code ${code}`));
+      if (code !== 0) {
+        const detail = stderr.trim() || `Codex exited with code ${code}`;
+        reject(new Error(detail));
       } else {
         resolve({ stdout, stderr, threadId, exitCode: code });
       }
@@ -200,6 +201,9 @@ export async function runSession(mode, text, effort) {
   const prompt = isResume ? preamble.followup + text : preamble.initial + text;
 
   fs.mkdirSync(path.dirname(RESPONSE_FILE), { recursive: true });
+  try {
+    fs.writeFileSync(RESPONSE_FILE, "", "utf8");
+  } catch {}
 
   const args = [];
   if (isResume) {
@@ -234,6 +238,15 @@ export async function runSession(mode, text, effort) {
     writeThreadId(result.threadId);
   }
 
-  const response = fs.readFileSync(RESPONSE_FILE, "utf8").trim();
+  let response = "";
+  try {
+    response = fs.readFileSync(RESPONSE_FILE, "utf8").trim();
+  } catch {}
+
+  if (!response) {
+    const detail = result.stderr?.trim() || "Codex produced no output";
+    throw new Error(`Codex returned an empty response. stderr: ${detail}`);
+  }
+
   return { response, threadId: result.threadId || existingThread, resumed: isResume };
 }
