@@ -37,6 +37,15 @@ Register the marketplace and install the plugin (run these inside Claude Code):
 /plugin install counterpoint@cc-plugin-counterpoint
 ```
 
+Install the MCP server's Node dependencies (once, in the plugin directory):
+
+```bash
+cd /path/to/cc-plugin-counterpoint/plugin
+npm install
+```
+
+After the first install, Claude Code auto-starts the counterpoint MCP server and the `mcp__counterpoint__*` tools become available.
+
 ## Usage
 
 ### Slash command
@@ -49,13 +58,25 @@ Register the marketplace and install the plugin (run these inside Claude Code):
 
 The skill activates automatically before finalizing implementation plans, architectural decisions, or technical strategies. It chooses `critique` or `consult` mode based on context. Skip with "no debate" or "just do it".
 
-### Script (direct)
+### MCP tools (primary interface)
+
+Claude calls these directly:
+
+- `mcp__counterpoint__critique` — review a proposal
+- `mcp__counterpoint__consult` — think through a question
+- `mcp__counterpoint__status` — active thread + auto-consult state
+- `mcp__counterpoint__reset` — clear thread
+- `mcp__counterpoint__auto_consult_on` / `_off` — toggle auto-consult
+
+### Script (fallback / debug)
+
+The CLI wrapper is kept for manual inspection:
 
 ```bash
-node scripts/counterpoint.mjs critique [--effort <level>] "<proposal>"
-node scripts/counterpoint.mjs consult [--effort <level>] "<question>"
-node scripts/counterpoint.mjs status
-node scripts/counterpoint.mjs reset
+node plugin/scripts/counterpoint.mjs critique [--effort <level>] "<proposal>"
+node plugin/scripts/counterpoint.mjs consult [--effort <level>] "<question>"
+node plugin/scripts/counterpoint.mjs status
+node plugin/scripts/counterpoint.mjs reset
 ```
 
 ## Reasoning effort levels

@@ -1,0 +1,10 @@
+{
+  "name": "counterpoint-mcp",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "MCP server for the counterpoint plugin — collaborative review with Codex CLI",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0"
+  }
+}
