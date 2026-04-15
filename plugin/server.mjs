@@ -39,12 +39,11 @@ server.registerTool(
     },
   },
   async ({ proposal, effort }) => {
-    const { response, threadId, resumed } = await runSession("critique", proposal, effort);
+    const { response } = await runSession("critique", proposal, effort);
     return {
       content: [
         { type: "text", text: response },
       ],
-      structuredContent: { threadId, resumed },
     };
   }
 );
@@ -63,12 +62,11 @@ server.registerTool(
     },
   },
   async ({ question, effort }) => {
-    const { response, threadId, resumed } = await runSession("consult", question, effort);
+    const { response } = await runSession("consult", question, effort);
     return {
       content: [
         { type: "text", text: response },
       ],
-      structuredContent: { threadId, resumed },
     };
   }
 );
