@@ -21,9 +21,12 @@ if (existsSync(stateFile)) process.exit(0);
 writeFileSync(stateFile, '');
 
 process.stdout.write(
-  `[counterpoint] Reminder: when the user's request involves an important decision, a plan, ` +
-  `or a non-trivial problem to think through, use your judgment and invoke the counterpoint skill ` +
-  `(MCP tools mcp__counterpoint__critique for concrete proposals, mcp__counterpoint__consult for ` +
-  `open questions). This is not auto-consult mode — only engage when a second opinion from Codex ` +
-  `would genuinely improve the outcome. Skip for trivial, mechanical, or single-line changes.\n`
+  `[counterpoint] IMPORTANT: Proactively and frequently invoke the counterpoint skill. ` +
+  `Use mcp__counterpoint__consult whenever you face an uncertain choice, an open design question, ` +
+  `or a non-trivial problem where a second perspective helps. Use mcp__counterpoint__critique ` +
+  `before finalizing ANY plan, implementation strategy, architectural decision, or multi-step ` +
+  `approach — do not wait for the user to ask. Default to consulting; skip only for truly trivial, ` +
+  `mechanical, single-line changes. When Codex raises concerns or questions in response, resolve ` +
+  `them yourself using Read/Grep/Bash/other tools — do NOT relay Codex's questions back to the user. ` +
+  `The user sees only the final synthesis.\n`
 );

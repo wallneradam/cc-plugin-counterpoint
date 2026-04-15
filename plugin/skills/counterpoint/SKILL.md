@@ -79,6 +79,20 @@ The debate between you and Codex runs as **as many rounds as genuinely useful, a
 
 **Run all rounds within a single invocation. Do NOT pause to ask the user between rounds — the user sees only the final synthesis.**
 
+### Codex's questions are YOUR questions to answer
+
+When Codex raises a concern, asks for clarification, or requests information about the codebase, **you resolve it yourself** — do NOT forward Codex's questions to the user. You have the full toolset (Read, Grep, Glob, Bash, etc.) and direct access to the code; Codex does not. Treat Codex's questions as research prompts for you to investigate.
+
+- ❌ Wrong: "Codex asks whether the auth module uses JWT or sessions — could you tell me?"
+- ✅ Right: Run `Grep` for auth patterns, find the answer, feed it back to Codex in the next round.
+
+Only escalate to the user when:
+- The question genuinely requires a product/business decision only the user can make (priorities, scope, preferences).
+- Information is not derivable from code, git history, or available tools.
+- A real ambiguity exists about the user's intent that affects the outcome.
+
+The user sees the final synthesis, not the back-and-forth. Don't break that contract by routing Codex's questions through them.
+
 ### Opening the debate
 
 **For `critique`** — you have a concrete proposal. Frame it as:
