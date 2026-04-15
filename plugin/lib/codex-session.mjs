@@ -19,7 +19,8 @@ Structure your response as:
 2. CONCERNS: Issues or risks you see, each paired with a suggested improvement
 3. ALTERNATIVES: Different approaches worth considering, if any — explain the trade-offs fairly
 4. GAPS: Missing considerations that would strengthen the proposal
-5. VERDICT: weak/moderate/strong with 1-sentence rationale
+5. OPEN QUESTIONS: Anything you'd want clarified to give a more confident review — leave empty if none
+6. VERDICT: weak/moderate/strong with 1-sentence rationale
 
 ---
 
@@ -29,7 +30,7 @@ Your colleague proposes:
 
 const CRITIQUE_FOLLOWUP_PREAMBLE = `Your colleague revised the proposal based on your feedback. Re-evaluate as a supportive collaborator. Acknowledge what improved, note any remaining concerns with suggestions, and highlight if any new issues were introduced. You are working toward the same outcome together.
 
-Same structure (STRENGTHS / CONCERNS / ALTERNATIVES / GAPS / VERDICT).
+Same structure (STRENGTHS / CONCERNS / ALTERNATIVES / GAPS / OPEN QUESTIONS / VERDICT).
 
 ---
 

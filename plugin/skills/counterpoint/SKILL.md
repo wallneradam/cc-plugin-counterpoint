@@ -73,87 +73,77 @@ Control how deeply Codex thinks via the `effort` argument. Choose based on decis
 
 If unsure, leave `effort` unset (uses Codex's default) or pass `"medium"`. Only escalate to `high`/`xhigh` when the decision has long-term or wide-reaching consequences.
 
-## Critique Protocol
+## Debate Protocol — organic, not fixed rounds
 
-Use when you have a concrete proposal to review. Run all rounds within a single invocation. Do NOT pause between rounds.
+The debate between you and Codex runs as **as many rounds as genuinely useful, and no more**. There are no mandatory rounds. After each Codex response, decide whether another round is worth it.
 
-### Round 1 — Propose
+**Run all rounds within a single invocation. Do NOT pause to ask the user between rounds — the user sees only the final synthesis.**
 
-1. Formulate your plan as a structured proposal:
-   - **Goal**: What are we trying to achieve?
-   - **Approach**: How will we achieve it?
-   - **Trade-offs**: What are we giving up?
-   - **Key decisions**: What are the critical choices?
+### Opening the debate
 
-2. Call `mcp__counterpoint__critique` with the `proposal` argument set to your structured proposal.
+**For `critique`** — you have a concrete proposal. Frame it as:
+- **Goal**: What are we trying to achieve?
+- **Approach**: How will we achieve it?
+- **Trade-offs**: What are we giving up?
+- **Key decisions**: What are the critical choices?
 
-3. Read Codex's feedback — note both the strengths it confirmed and the concerns it raised.
+Call `mcp__counterpoint__critique` with the structured proposal.
 
-### Round 2 — Refine
+**For `consult`** — you are unsure. Frame it as:
+- **Context**: What are we building, what constraints exist?
+- **Uncertainty**: What specifically are you unsure about?
+- **Options you see**: What approaches have you considered so far?
 
-Codex remembers Round 1. Do NOT resend the full proposal — only send what changed.
+Call `mcp__counterpoint__consult` with the framing.
 
-1. Address the concerns from Round 1.
-2. Incorporate valid alternatives or explain why they don't apply.
-3. Fill any gaps Codex identified.
-4. Call `mcp__counterpoint__critique` again with only the delta as `proposal`:
-   `"Changes based on your feedback: [list concrete changes]. Kept [X] because [reason]. Open question: [if any]."`
+### Evaluating Codex's response — be mildly critical
 
-5. Read Codex's re-evaluation.
+Codex is a trusted colleague, but **not automatically right**. It lacks access to the codebase, does not see the full context, and sometimes gives generic advice where specific advice is needed. Before accepting anything:
 
-### Round 3 — Final (conditional)
+- Does the concern apply to **this** problem, or is it a generic worry?
+- Is the alternative Codex suggests actually better, or just different?
+- Did Codex misunderstand part of the proposal? If yes, clarify in the next round.
+- Is a recommendation grounded in real trade-offs, or a reflex preference?
 
-Only run this round if Codex's Round 2 VERDICT is "weak" or if Codex raised material new concerns.
+**Defend your position when you believe you're right.** Agreement should come from being convinced, not from deference. Disagreement stays respectful — "I see it differently because…" — never dismissive.
 
-1. Address remaining issues.
-2. Again, send only the delta via another `mcp__counterpoint__critique` call.
+### Deciding to continue
 
-### Synthesis
+**Continue** when:
+- Codex raised a substantive concern and you have a real answer or counter-argument.
+- An OPEN QUESTION from Codex actually matters for the outcome.
+- A new angle emerged that you haven't explored together yet.
+- You disagree with Codex on something material and want to resolve it.
 
-After the review, present the user with a clear synthesis:
+**Stop** when:
+- You've reached consensus, or the remaining differences are taste/preference.
+- Codex's latest response is mostly confirmation without new content.
+- Further rounds would only polish, not change the outcome.
+- The user's original question is sufficiently answered.
 
-1. **Original plan** — brief summary of starting point
-2. **What Codex confirmed** — strengths and validated decisions
-3. **Key concerns raised** — important issues Codex identified
-4. **Changes made** — what the review improved
-5. **Final plan** — the refined, review-tested version
-6. **Accepted risks** — anything Codex flagged that you chose to keep, and why
+### Continuing a round
 
-## Consult Protocol
+Codex remembers everything. Send **only the delta**, not the full proposal/question:
 
-Use when you are unsure about the approach and want to think it through with Codex. Run 2-3 rounds.
+- Critique: `"Addressed X by [change]. Kept Y because [reason]. On your concern about Z — I think it doesn't apply here because [specific reason]. Still open: [if any]."`
+- Consult: `"Leaning toward [X] because [reason]. Not convinced by [Codex's suggestion] because [reason]. Still unsure about [specific aspect]."`
 
-### Round 1 — Ask
+### Synthesis — what the user sees
 
-1. Describe the problem and your uncertainty:
-   - **Context**: What are we building, what constraints exist?
-   - **Uncertainty**: What specifically are you unsure about?
-   - **Options you see**: What approaches have you considered so far?
+After the debate ends, present the user with a concise summary. The intermediate rounds stay hidden unless the user explicitly asks for them.
 
-2. Call `mcp__counterpoint__consult` with `question` set to your framing.
+**For critique:**
+1. **Final plan** — the refined, review-tested version
+2. **What the review changed** — concrete improvements from the debate
+3. **Where Codex and I differed** — any unresolved disagreements, with your reasoning
+4. **Accepted risks** — things Codex flagged that you chose to keep, and why
 
-3. Read Codex's analysis of options and recommendation.
+**For consult:**
+1. **Decision** — what you settled on
+2. **Why** — your reasoning, including what Codex contributed and what you pushed back on
+3. **Open questions** — anything worth flagging that the discussion didn't resolve
 
-### Round 2 — Narrow down
-
-1. React to Codex's suggestions — which options resonate, which don't fit.
-2. Ask follow-up questions on the most promising direction.
-3. Call `mcp__counterpoint__consult` again with only what's new:
-   `"Leaning toward [X] because [reason]. But still unsure about [specific aspect]. What do you think about [follow-up]?"`
-
-### Round 3 — Confirm (optional)
-
-If you've reached a decision, optionally validate it with another `mcp__counterpoint__consult` call:
-`"Decided on [approach]. Quick sanity check: anything I'm missing?"`
-
-### Synthesis
-
-Present the user with:
-
-1. **Problem** — what you were unsure about
-2. **Options explored** — what you and Codex considered
-3. **Decision** — what you settled on and why
-4. **Key insight from Codex** — what helped most in the discussion
+The synthesis reflects **your** mediated judgment, not just Codex's opinion echoed back.
 
 ## Session Management — Codex remembers everything
 
