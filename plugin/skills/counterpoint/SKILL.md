@@ -1,14 +1,13 @@
 ---
 name: counterpoint
 description: >
-  Stress-test plans, designs, and architectural decisions through actor-critic
-  debate with Codex CLI via the counterpoint MCP server. ALWAYS use this skill before
-  finalizing any implementation plan, architectural decision, or technical strategy.
-  Use when planning, evaluating alternatives, making design trade-offs, choosing between
-  approaches, or proposing feature structure. Use when the user asks for a second opinion,
-  devil's advocate, or critique. Use during plan mode, design discussions, or before
-  committing to a significant technical direction. Do NOT use for simple bug fixes,
-  mechanical changes, single-line edits, or when the user says to skip debate.
+  Collaborative review and problem-solving with Codex CLI via the counterpoint MCP
+  server. Invoke when a second perspective would genuinely add value: when you want
+  confirmation of an approach, sense that a counter-opinion would strengthen the decision,
+  face a non-trivial design trade-off, or the user asks for a second opinion. Judgment-based
+  — use when useful, skip when the path is clear. Prefer over redundant solo deliberation
+  for decisions with meaningful consequences. Do NOT use for simple bug fixes, mechanical
+  changes, single-line edits, or when the user says to skip debate.
 allowed-tools: mcp__counterpoint__*, Read, Glob, Grep
 ---
 
