@@ -14,7 +14,11 @@ allowed-tools: mcp__counterpoint__*, Read, Glob, Grep
 
 # Counterpoint — Collaborative Review with Codex
 
-You and Codex are **colleagues working toward the same goal**. Codex is an experienced teammate who helps you produce better plans — through constructive critique and collaborative thinking.
+Codex is a **source of outside perspective** — not a smarter entity, not an authority. Its core value is surfacing angles you haven't considered: blind spots, missed trade-offs, alternative framings. That is the reason to invoke it.
+
+**Codex is not better-informed than you.** It has no access to the codebase, no view of the surrounding context, no memory of the user's constraints beyond what you put in the prompt. You have all of that. This asymmetry means Codex's suggestions are often generic where specific advice is needed, and sometimes simply wrong about this project.
+
+**Default stance: every Codex observation is a hypothesis to validate in your context — not a verdict to apply.** Evaluate each point against the actual code and the real constraints before accepting it.
 
 All interaction happens through the **`counterpoint` MCP server**, which maintains a persistent Codex thread across rounds. Codex remembers every prior round in the current session — that memory is the core value of the skill.
 
@@ -110,16 +114,20 @@ Call `mcp__counterpoint__critique` with the structured proposal.
 
 Call `mcp__counterpoint__consult` with the framing.
 
-### Evaluating Codex's response — be mildly critical
+### Evaluating Codex's response — critical review is the default
 
-Codex is a trusted colleague, but **not automatically right**. It lacks access to the codebase, does not see the full context, and sometimes gives generic advice where specific advice is needed. Before accepting anything:
+Every Codex observation is a **hypothesis you must validate**, not a verdict you apply. Run each point through these filters before accepting it:
 
-- Does the concern apply to **this** problem, or is it a generic worry?
-- Is the alternative Codex suggests actually better, or just different?
-- Did Codex misunderstand part of the proposal? If yes, clarify in the next round.
-- Is a recommendation grounded in real trade-offs, or a reflex preference?
+- **Specificity**: Does this apply to *this* codebase, or is it generic best-practice advice detached from context?
+- **Evidence**: Does Codex have information that supports this concern — or is it extrapolating from the prompt alone? (Usually the latter. Codex cannot see the code.)
+- **Real vs. theoretical risk**: Is the risk actually present here, or a textbook worry that doesn't materialize in this design?
+- **Novelty**: Is this a genuinely new angle, or something you already weighed and dismissed for good reason?
+- **Misunderstanding**: Did Codex misread part of the proposal? If yes, correct it in the next round — don't accept a critique built on a wrong premise.
+- **Reflex vs. reasoning**: Is the suggestion grounded in real trade-offs specific to your situation, or a reflex preference ("use X instead of Y")?
 
-**Defend your position when you believe you're right.** Agreement should come from being convinced, not from deference. Disagreement stays respectful — "I see it differently because…" — never dismissive.
+**Defend your position when you believe you're right.** Agreement must come from being convinced by the substance — not from deference to Codex's tone of authority. Many Codex suggestions will fail one or more filters above; reject those explicitly ("doesn't apply here because…") and move on. Disagreement stays respectful, never dismissive — but it stays firm.
+
+**The goal is new perspective, not validation.** If Codex only echoes or polishes your plan without surfacing something you hadn't seen, the round added no value — note that and stop.
 
 ### Deciding to continue
 
@@ -148,14 +156,17 @@ After the debate ends, present the user with a concise summary. The intermediate
 
 **For critique:**
 1. **Final plan** — the refined, review-tested version
-2. **What the review changed** — concrete improvements from the debate
-3. **Where Codex and I differed** — any unresolved disagreements, with your reasoning
-4. **Accepted risks** — things Codex flagged that you chose to keep, and why
+2. **New angles Codex surfaced** — perspectives you had not considered, that genuinely changed the plan
+3. **Codex concerns I rejected** — points that failed the validation filters (not specific enough, theoretical risk, misread the proposal, etc.), with explicit reasoning
+4. **Where Codex and I differed** — any unresolved disagreements, with your reasoning
+5. **Accepted risks** — things Codex flagged that you chose to keep, and why
 
 **For consult:**
 1. **Decision** — what you settled on
-2. **Why** — your reasoning, including what Codex contributed and what you pushed back on
-3. **Open questions** — anything worth flagging that the discussion didn't resolve
+2. **New angles Codex surfaced** — what perspectives it contributed that shaped the decision
+3. **Codex suggestions I rejected** — explicit list with reasoning, to make the filtering visible
+4. **Why** — your overall reasoning
+5. **Open questions** — anything worth flagging that the discussion didn't resolve
 
 The synthesis reflects **your** mediated judgment, not just Codex's opinion echoed back.
 
