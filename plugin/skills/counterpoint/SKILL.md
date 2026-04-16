@@ -73,9 +73,8 @@ Control how deeply Codex thinks via the `effort` argument. Choose based on decis
 | `medium`   | Default. Most design decisions, API choices, data modeling                 |
 | `high`     | Architecture-level decisions, security-critical design, complex trade-offs |
 | `xhigh`    | Foundational decisions that are very hard to reverse later                 |
-| `low`      | Quick sanity checks, minor design details                                  |
 
-If unsure, leave `effort` unset (uses Codex's default) or pass `"medium"`. Only escalate to `high`/`xhigh` when the decision has long-term or wide-reaching consequences.
+`medium` is the minimum — lower levels are not permitted. If unsure, leave `effort` unset (uses Codex's default) or pass `"medium"`. Only escalate to `high`/`xhigh` when the decision has long-term or wide-reaching consequences.
 
 ## Debate Protocol — organic, not fixed rounds
 

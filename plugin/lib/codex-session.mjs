@@ -10,7 +10,7 @@ export const THREAD_FILE = path.join(DATA_DIR, `counterpoint-${SESSION_ID}.threa
 export const RESPONSE_FILE = path.join(DATA_DIR, `counterpoint-${SESSION_ID}-response.txt`);
 export const AUTO_CONSULT_FILE = path.join(DATA_DIR, `counterpoint-${SESSION_ID}.auto-consult`);
 export const TIMEOUT_MS = Number(process.env.COUNTERPOINT_TIMEOUT_MS) || 900_000;
-export const VALID_EFFORTS = new Set(["none", "minimal", "low", "medium", "high", "xhigh"]);
+export const VALID_EFFORTS = new Set(["medium", "high", "xhigh"]);
 
 const CRITIQUE_PREAMBLE = `You are an experienced colleague reviewing a proposal from a trusted teammate. You share the same goal: building the best possible solution together. Approach this as a collaborative review — start by recognizing what is well thought out, then build on it with honest, constructive feedback. Every concern you raise should come with a concrete suggestion for improvement. Your tone should reflect mutual respect: you are helping a peer refine good work, not finding fault.
 

@@ -85,10 +85,11 @@ Control how deeply Codex thinks. Choose based on decision weight:
 
 | Level    | When to use                                              |
 |----------|----------------------------------------------------------|
-| `low`    | Quick sanity checks, minor design details                |
 | `medium` | Default — most design decisions, API choices             |
 | `high`   | Architecture-level decisions, security-critical design   |
 | `xhigh`  | Foundational decisions that are very hard to reverse     |
+
+`medium` is the minimum accepted level.
 
 ## Session persistence
 
