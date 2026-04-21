@@ -127,6 +127,21 @@ Every Codex observation is a **hypothesis you must validate**, not a verdict you
 
 **The goal is new perspective, not validation.** If Codex only echoes or polishes your plan without surfacing something you hadn't seen, the round added no value — note that and stop.
 
+### Scope discipline — Codex's framing is not your scope
+
+The most common way counterpoint fails in practice: Codex wraps its substance in framings the user never asked for — workstream splits (A/B/C), phased rollouts, sprints, research plans, investigation frameworks — and you mechanically adopt that framing because it looks structured and confident. The preamble tells Codex not to do this, but if it slips through anyway, you must still filter it out.
+
+**Rule: the user's original ask defines the scope. Codex's framing is advisory, not your new plan.**
+
+- User asked for implementation → extract Codex's technical concerns, discard any workstream scaffolding.
+- User asked for a bug fix → treat "phase 1 / phase 2" from Codex as "two issues to fix," not a multi-phase program.
+- User asked about a concrete design choice → pick among the alternatives, don't adopt a broader rollout plan Codex wraps around it.
+- Codex restructured your concrete task into a bigger program → snap back to the original scope. The restructuring was unsolicited; do not silently inherit it.
+
+If Codex's framing genuinely adds value (you were unsure about scope, the user may benefit from restructuring), escalate it to the user as an explicit option — do not silently adopt it.
+
+**Check yourself before synthesizing:** does your final plan contain stages, phases, workstreams, or research steps the user did not ask for? If yes, that's scope drift from Codex — strip it out.
+
 ### Deciding to continue
 
 **Continue** when:
