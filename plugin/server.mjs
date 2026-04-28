@@ -7,8 +7,6 @@ import {
   runSession,
   readThreadId,
   clearThreadId,
-  isAutoConsult,
-  setAutoConsult,
   VALID_EFFORTS,
 } from "./lib/codex-session.mjs";
 
@@ -18,10 +16,12 @@ const effortSchema = z
   .optional();
 
 const COUNTERPOINT_NATURE = `
-Counterpoint is an iterative, peer-to-peer collaborative review loop with Codex CLI — NOT a one-shot delegated rescue. Each round continues the same persistent Codex thread, so Codex remembers prior rounds and the conversation builds up. Use this when you want Codex as a thinking partner over multiple exchanges. Do NOT use the codex-rescue agent or any other Codex hand-off mechanism for counterpoint work — those create fresh, disconnected sessions every time.`.trim();
+Counterpoint is an iterative, peer-to-peer collaborative review loop with Codex CLI — NOT a one-shot delegated rescue. Each round continues the same persistent Codex thread, so Codex remembers prior rounds and the conversation builds up. Use this when you want Codex as a thinking partner over multiple exchanges. Do NOT use the codex-rescue agent or any other Codex hand-off mechanism for counterpoint work — those create fresh, disconnected sessions every time.
+
+The user does NOT see the raw response from these tools — MCP results are visible to the assistant only. After every call, summarize Codex's response in chat for the user, and only reference points that appear in your summary.`.trim();
 
 const server = new McpServer(
-  { name: "counterpoint", version: "1.0.0" },
+  { name: "counterpoint", version: "2.0.0" },
   { capabilities: { tools: {} } }
 );
 
@@ -75,19 +75,17 @@ server.registerTool(
   "status",
   {
     title: "Counterpoint thread status",
-    description: "Report the active Codex thread ID (if any) and whether auto-consult mode is enabled.",
+    description: "Report the active Codex thread ID (if any).",
     inputSchema: {},
   },
   async () => {
     const threadId = readThreadId();
-    const autoConsult = isAutoConsult();
-    const lines = [
-      threadId ? `Active thread: ${threadId}` : "No active counterpoint thread.",
-      `Auto-consult: ${autoConsult ? "ON" : "OFF"}`,
-    ];
+    const text = threadId
+      ? `Active thread: ${threadId}`
+      : "No active counterpoint thread.";
     return {
-      content: [{ type: "text", text: lines.join("\n") }],
-      structuredContent: { threadId, autoConsult },
+      content: [{ type: "text", text }],
+      structuredContent: { threadId },
     };
   }
 );
@@ -103,38 +101,6 @@ server.registerTool(
     clearThreadId();
     return {
       content: [{ type: "text", text: "Counterpoint thread cleared." }],
-    };
-  }
-);
-
-server.registerTool(
-  "auto_consult_on",
-  {
-    title: "Enable auto-consult mode",
-    description: "Activate persistent auto-consult: Claude consults Codex on every significant decision automatically.",
-    inputSchema: {},
-  },
-  async () => {
-    setAutoConsult(true);
-    return {
-      content: [{ type: "text", text: "Auto-consult: ON" }],
-      structuredContent: { autoConsult: true },
-    };
-  }
-);
-
-server.registerTool(
-  "auto_consult_off",
-  {
-    title: "Disable auto-consult mode",
-    description: "Deactivate auto-consult. Claude returns to consulting Codex only when relevant per the skill's normal rules.",
-    inputSchema: {},
-  },
-  async () => {
-    setAutoConsult(false);
-    return {
-      content: [{ type: "text", text: "Auto-consult: OFF" }],
-      structuredContent: { autoConsult: false },
     };
   }
 );

@@ -4,8 +4,6 @@ import {
   runSession,
   readThreadId,
   clearThreadId,
-  isAutoConsult,
-  setAutoConsult,
   VALID_EFFORTS,
 } from "../lib/codex-session.mjs";
 
@@ -16,7 +14,6 @@ function status() {
   } else {
     console.log("No active counterpoint thread.");
   }
-  console.log(`Auto-consult: ${isAutoConsult() ? "ON" : "OFF"}`);
 }
 
 async function main() {
@@ -62,19 +59,8 @@ async function main() {
       clearThreadId();
       console.log("Counterpoint thread cleared.");
       break;
-    case "auto-on":
-      setAutoConsult(true);
-      console.log("Auto-consult: ON");
-      break;
-    case "auto-off":
-      setAutoConsult(false);
-      console.log("Auto-consult: OFF");
-      break;
-    case "auto-status":
-      console.log(isAutoConsult() ? "ON" : "OFF");
-      break;
     default:
-      console.error("Usage: counterpoint.mjs <critique|consult|status|reset|auto-on|auto-off|auto-status> [args]");
+      console.error("Usage: counterpoint.mjs <critique|consult|status|reset> [args]");
       process.exitCode = 1;
   }
 }

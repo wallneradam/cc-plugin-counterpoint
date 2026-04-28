@@ -1,6 +1,6 @@
 # Counterpoint — Claude Code Plugin
 
-Collaborative review and problem-solving plugin for Claude Code. Pairs Claude with Codex CLI as trusted colleagues who refine plans, explore alternatives, and stress-test decisions together.
+Manual collaborative review and problem-solving plugin for Claude Code. Pairs Claude with Codex CLI as a trusted colleague — Claude calls Codex **only when you explicitly ask**, holds an iterative multi-round dialogue with it, and surfaces a brief summary of Codex's response in chat after every round.
 
 ## How it works
 
@@ -10,17 +10,17 @@ Two modes for different situations:
 
 1. **Claude** formulates a structured proposal
 2. **Codex** reviews it — acknowledges strengths, raises concerns with suggestions, identifies gaps
-3. Claude **refines** based on the feedback
-4. Repeat until the plan is solid (2-3 rounds)
+3. Claude **summarizes** Codex's response in chat and refines based on the feedback
+4. Repeat for as many rounds as the topic genuinely needs
 
 ### Consult — think through a problem together
 
 1. **Claude** describes the problem and uncertainty
 2. **Codex** explores options, weighs trade-offs, shares a recommendation
-3. They **narrow down** together through follow-up discussion
+3. They **narrow down** through follow-up rounds, with each Codex response summarized in chat
 4. Claude arrives at a well-considered decision
 
-Both modes produce a clear synthesis for the user.
+Each round produces a visible summary in chat — you see the dialogue evolve, not just the final synthesis.
 
 ## Installation
 
@@ -48,25 +48,24 @@ After the first install, Claude Code auto-starts the counterpoint MCP server and
 
 ## Usage
 
-### Slash command
+Invocation is **always explicit**. Claude does not call Codex on its own — it waits for you.
+
+### Slash commands
 
 ```
 /counterpoint <plan or proposal to review>
+/consult <question or problem to explore>
+/reset
 ```
 
-### Skill (auto-triggered)
+Or simply ask: "Get a second opinion on this", "Run this by Codex", "What does Codex think?".
 
-The skill activates automatically before finalizing implementation plans, architectural decisions, or technical strategies. It chooses `critique` or `consult` mode based on context. Skip with "no debate" or "just do it".
-
-### MCP tools (primary interface)
-
-Claude calls these directly:
+### MCP tools (primary interface — Claude calls these directly)
 
 - `mcp__counterpoint__critique` — review a proposal
 - `mcp__counterpoint__consult` — think through a question
-- `mcp__counterpoint__status` — active thread + auto-consult state
+- `mcp__counterpoint__status` — active thread
 - `mcp__counterpoint__reset` — clear thread
-- `mcp__counterpoint__auto_consult_on` / `_off` — toggle auto-consult
 
 ### Script (fallback / debug)
 
@@ -99,7 +98,9 @@ Use `reset` to clear the thread when switching to an unrelated project.
 
 ## Design philosophy
 
-The interaction between Claude and Codex is always **collaborative and respectful**. Codex acts as a trusted colleague — it recognizes good ideas, builds on them, and raises concerns constructively. This approach produces better outcomes than adversarial "find the flaws" prompting.
+The interaction between Claude and Codex is always **collaborative and respectful**. Codex acts as a trusted colleague — it recognizes good ideas, builds on them, and raises concerns constructively. This produces better outcomes than adversarial "find the flaws" prompting.
+
+Equally important: Codex is **a perspective, not an authority**. It cannot see the code; Claude can. Every Codex point is a hypothesis to validate against the actual project — accepted on substance, rejected with explicit reasoning when it doesn't apply.
 
 ## License
 

@@ -1,210 +1,150 @@
 ---
 name: counterpoint
 description: >
-  Collaborative review and problem-solving with Codex CLI via the counterpoint MCP
-  server. Invoke when a second perspective would genuinely add value: when you want
-  confirmation of an approach, sense that a counter-opinion would strengthen the decision,
-  face a non-trivial design trade-off, or the user asks for a second opinion. Judgment-based
-  — use when useful, skip when the path is clear. Prefer over redundant solo deliberation
-  for decisions with meaningful consequences. Do NOT use for simple bug fixes, mechanical
-  changes, single-line edits, or when the user says to skip debate.
+  Collaborative review and problem-solving with Codex CLI via the counterpoint MCP server.
+  Invoke ONLY when the user explicitly asks — through `/counterpoint`, `/consult`, or a direct
+  request for a second opinion. Do NOT invoke proactively, do NOT invoke "before finalizing",
+  do NOT treat any other situation as a trigger.
 allowed-tools: mcp__counterpoint__*, Read, Glob, Grep
 ---
 
 # Counterpoint — Collaborative Review with Codex
 
-Codex is a **source of outside perspective** — not a smarter entity, not an authority. Its core value is surfacing angles you haven't considered: blind spots, missed trade-offs, alternative framings. That is the reason to invoke it.
+## When to invoke
 
-**Codex is not better-informed than you.** It has no access to the codebase, no view of the surrounding context, no memory of the user's constraints beyond what you put in the prompt. You have all of that. This asymmetry means Codex's suggestions are often generic where specific advice is needed, and sometimes simply wrong about this project.
+**Only when the user explicitly asks.** Examples:
 
-**Default stance: every Codex observation is a hypothesis to validate in your context — not a verdict to apply.** Evaluate each point against the actual code and the real constraints before accepting it.
+- `/counterpoint <proposal>` — critique mode
+- `/consult <question>` — consult mode
+- "Ask Codex what it thinks", "Get a second opinion", "Run this by Codex"
 
-All interaction happens through the **`counterpoint` MCP server**, which maintains a persistent Codex thread across rounds. Codex remembers every prior round in the current session — that memory is the core value of the skill.
+That's it. Do NOT invoke:
 
-| MCP tool                              | Purpose                                                |
-|---------------------------------------|--------------------------------------------------------|
-| `mcp__counterpoint__critique`         | Review a concrete proposal                             |
-| `mcp__counterpoint__consult`          | Think through an uncertain problem together            |
-| `mcp__counterpoint__status`           | Check the active thread and auto-consult state         |
-| `mcp__counterpoint__reset`            | Clear the thread (rare — only for fresh project context)|
-| `mcp__counterpoint__auto_consult_on`  | Enable auto-consult mode                               |
-| `mcp__counterpoint__auto_consult_off` | Disable auto-consult mode                              |
+- Before finalizing plans
+- Before architectural decisions
+- When you sense a tradeoff
+- Because the situation "feels" non-trivial
 
-## Tool selection — critical
+If the user did not ask, do not invoke.
 
-**Always use the `mcp__counterpoint__*` tools directly.** Do NOT substitute:
+## What Codex is — and is not
 
-- ❌ Do NOT call `codex-rescue` or any other Codex agent — those create fresh, disconnected sessions every time and lose the multi-round context that makes counterpoint useful.
-- ❌ Do NOT shell out to `node .../counterpoint.mjs` — the CLI exists only as a fallback; the MCP tools are the intended interface.
-- ✅ Call `mcp__counterpoint__critique` / `mcp__counterpoint__consult` directly with the `proposal` or `question` argument.
+Codex is a **source of outside perspective**, not an authority. It has no access to the codebase, no view of project context beyond what you put in the prompt. Its observations are **hypotheses for you to validate against the actual code** — not verdicts to apply.
 
-Counterpoint = iterative peer dialogue with thread memory. Rescue = one-shot delegated hand-off. They serve different purposes — don't conflate them.
+| MCP tool                        | Purpose                                 |
+|---------------------------------|-----------------------------------------|
+| `mcp__counterpoint__critique`   | Review a concrete proposal              |
+| `mcp__counterpoint__consult`    | Think through an uncertain problem      |
+| `mcp__counterpoint__status`     | Check the active thread                 |
+| `mcp__counterpoint__reset`     | Clear the thread (rare)                 |
 
-## Auto-Consult Mode
+Always use these MCP tools directly. Do NOT substitute `codex-rescue` or any other Codex agent — those create disconnected one-shot sessions and lose the thread memory that makes counterpoint useful.
 
-The user can toggle auto-consult with `/consult_on` and `/consult_off`. When active, you MUST consult Codex on **every significant decision** — not just when explicitly asked.
+## Critical: the user does not see Codex's raw response
 
-Check whether auto-consult is active by calling `mcp__counterpoint__status`. If `autoConsult` is `true`, follow the auto-consult rules from the `/consult_on` command instructions. If `false`, use the normal "When to use" guidelines below.
+MCP tool results are visible to **you only**. The user sees nothing of what Codex returned unless you put it in your chat reply.
 
-## When to use
+**Protocol after every counterpoint call:**
 
-- Before finalizing an implementation plan → `critique`
-- When evaluating multiple design alternatives → `consult`
-- During plan mode discussions → `critique` or `consult`
-- Before committing to architectural decisions → `critique`
-- When unsure about the best approach → `consult`
-- When the user asks for a second opinion → `critique`
-- **When auto-consult is ON** → consult or critique on every non-trivial action
+1. Write a **short summary in chat** (3–8 bullets, plain prose). Capture: Codex's main points, the strongest concern, anything new it surfaced. Skip filler, skip Codex's section headers, skip restating your own proposal.
+2. **Only reference points that appear in your summary** in the rest of your reply. Do not allude to "as Codex noted…" about anything you did not put in the summary — to the user, that reference is invisible context.
+3. Then state your reaction: what you accept, what you push back on, and why.
 
-## When NOT to use
+If the summary would be longer than ~10 bullets, your summary is too detailed — compress further. The user wants a digest, not a transcript.
 
-- Simple bug fixes with obvious solutions (unless auto-consult is ON)
-- Mechanical changes (renaming, formatting)
-- Single-line edits or trivial refactors
-- When the user explicitly says: "skip counterpoint", "no debate", "just do it"
+## Reasoning effort
 
-## Reasoning Effort
+Pass `effort` to control how deeply Codex thinks:
 
-Control how deeply Codex thinks via the `effort` argument. Choose based on decision weight:
+| Effort   | When to use                                                                |
+|----------|----------------------------------------------------------------------------|
+| `medium` | Default. Most design decisions, API choices, data modeling                 |
+| `high`   | Architecture-level decisions, security-critical design, complex trade-offs |
+| `xhigh`  | Foundational decisions that are very hard to reverse later                 |
 
-| Effort     | When to use                                                                |
-|------------|----------------------------------------------------------------------------|
-| `medium`   | Default. Most design decisions, API choices, data modeling                 |
-| `high`     | Architecture-level decisions, security-critical design, complex trade-offs |
-| `xhigh`    | Foundational decisions that are very hard to reverse later                 |
+`medium` is the minimum. If unsure, omit `effort` and let Codex use its default.
 
-`medium` is the minimum — lower levels are not permitted. If unsure, leave `effort` unset (uses Codex's default) or pass `"medium"`. Only escalate to `high`/`xhigh` when the decision has long-term or wide-reaching consequences.
+## Multi-round debate is the point
 
-## Debate Protocol — organic, not fixed rounds
+A single Codex round is rarely the end of the conversation. The whole reason this plugin exists is **iterative dialogue** — disagreement, clarification, pushback, refinement. The persistent thread means Codex remembers prior rounds; only send the delta in round 2+.
 
-The debate between you and Codex runs as **as many rounds as genuinely useful, and no more**. There are no mandatory rounds. After each Codex response, decide whether another round is worth it.
+**After each round, decide whether another is worth it.** Continue when:
 
-**Run all rounds within a single invocation. Do NOT pause to ask the user between rounds — the user sees only the final synthesis.**
+- Codex raised a concern you have a real counter-argument for — push back and see what it says.
+- Codex misread part of the proposal — correct it and ask it to re-evaluate.
+- A new angle emerged that neither of you has explored yet.
+- You disagree on something material and want to resolve it, not paper over it.
 
-### Codex's questions are YOUR questions to answer
+**Stop** when:
 
-When Codex raises a concern, asks for clarification, or requests information about the codebase, **you resolve it yourself** — do NOT forward Codex's questions to the user. You have the full toolset (Read, Grep, Glob, Bash, etc.) and direct access to the code; Codex does not. Treat Codex's questions as research prompts for you to investigate.
+- You've converged, or remaining differences are taste/preference.
+- Codex's latest response is mostly confirmation without new content.
+- The user's original question is sufficiently answered.
 
-- ❌ Wrong: "Codex asks whether the auth module uses JWT or sessions — could you tell me?"
-- ✅ Right: Run `Grep` for auth patterns, find the answer, feed it back to Codex in the next round.
+There is no fixed round count — but if the conversation ended after Round 1 and you didn't try a second round, ask yourself why. A single back-and-forth is the floor for any non-trivial topic, not the ceiling.
 
-Only escalate to the user when:
-- The question genuinely requires a product/business decision only the user can make (priorities, scope, preferences).
-- Information is not derivable from code, git history, or available tools.
-- A real ambiguity exists about the user's intent that affects the outcome.
+### Round visibility — every round shows up in chat
 
-The user sees the final synthesis, not the back-and-forth. Don't break that contract by routing Codex's questions through them.
+Each round = one MCP call + one chat-visible summary (per the "user does not see raw response" rule above). The user should see the dialogue evolve: round 1 summary → your pushback → round 2 summary → your reaction → and so on. Do not silently chain rounds and present only a final synthesis — that hides the substance the user is here to see.
 
-### Opening the debate
+If you anticipate ~3 rounds, that's three visible summaries in chat, not one.
 
-**For `critique`** — you have a concrete proposal. Frame it as:
-- **Goal**: What are we trying to achieve?
-- **Approach**: How will we achieve it?
-- **Trade-offs**: What are we giving up?
-- **Key decisions**: What are the critical choices?
+### Codex's questions are yours to answer
 
-Call `mcp__counterpoint__critique` with the structured proposal.
+When Codex asks about the codebase ("does the auth module use JWT?"), **investigate it yourself** with Read/Grep/Glob and feed the answer back in the next round. Do not forward Codex's questions to the user — Codex cannot see the code, you can.
 
-**For `consult`** — you are unsure. Frame it as:
-- **Context**: What are we building, what constraints exist?
-- **Uncertainty**: What specifically are you unsure about?
-- **Options you see**: What approaches have you considered so far?
+Only escalate to the user when the question is a genuine product/business decision, not a code-fact question.
 
-Call `mcp__counterpoint__consult` with the framing.
+### Defending your position
 
-### Evaluating Codex's response — critical review is the default
+Agreement must come from being convinced by substance, not deference to Codex's confident tone. Run each Codex point through these filters before accepting:
 
-Every Codex observation is a **hypothesis you must validate**, not a verdict you apply. Run each point through these filters before accepting it:
+- **Specificity** — does it apply to *this* code, or is it generic best-practice?
+- **Evidence** — does Codex have grounds, or is it extrapolating from the prompt alone?
+- **Real vs. theoretical risk** — would this actually happen here?
+- **Misunderstanding** — did Codex misread part of the proposal?
 
-- **Specificity**: Does this apply to *this* codebase, or is it generic best-practice advice detached from context?
-- **Evidence**: Does Codex have information that supports this concern — or is it extrapolating from the prompt alone? (Usually the latter. Codex cannot see the code.)
-- **Real vs. theoretical risk**: Is the risk actually present here, or a textbook worry that doesn't materialize in this design?
-- **Novelty**: Is this a genuinely new angle, or something you already weighed and dismissed for good reason?
-- **Misunderstanding**: Did Codex misread part of the proposal? If yes, correct it in the next round — don't accept a critique built on a wrong premise.
-- **Reflex vs. reasoning**: Is the suggestion grounded in real trade-offs specific to your situation, or a reflex preference ("use X instead of Y")?
-
-**Defend your position when you believe you're right.** Agreement must come from being convinced by the substance — not from deference to Codex's tone of authority. Many Codex suggestions will fail one or more filters above; reject those explicitly ("doesn't apply here because…") and move on. Disagreement stays respectful, never dismissive — but it stays firm.
-
-**The goal is new perspective, not validation.** If Codex only echoes or polishes your plan without surfacing something you hadn't seen, the round added no value — note that and stop.
+Reject points that fail these filters explicitly: "doesn't apply here because…" — and say so in your chat summary so the user sees the filtering.
 
 ### Scope discipline — Codex's framing is not your scope
 
-The most common way counterpoint fails in practice: Codex wraps its substance in framings the user never asked for — workstream splits (A/B/C), phased rollouts, sprints, research plans, investigation frameworks — and you mechanically adopt that framing because it looks structured and confident. The preamble tells Codex not to do this, but if it slips through anyway, you must still filter it out.
+Common failure mode: Codex wraps technical content in unrequested workstream/phase/sprint framings, and you adopt it because it looks structured. **The user's original ask defines the scope.** Strip out workstreams, phases, rollout plans, research programs that the user did not request — keep only the technical substance.
 
-**Rule: the user's original ask defines the scope. Codex's framing is advisory, not your new plan.**
-
-- User asked for implementation → extract Codex's technical concerns, discard any workstream scaffolding.
-- User asked for a bug fix → treat "phase 1 / phase 2" from Codex as "two issues to fix," not a multi-phase program.
-- User asked about a concrete design choice → pick among the alternatives, don't adopt a broader rollout plan Codex wraps around it.
-- Codex restructured your concrete task into a bigger program → snap back to the original scope. The restructuring was unsolicited; do not silently inherit it.
-
-If Codex's framing genuinely adds value (you were unsure about scope, the user may benefit from restructuring), escalate it to the user as an explicit option — do not silently adopt it.
-
-**Check yourself before synthesizing:** does your final plan contain stages, phases, workstreams, or research steps the user did not ask for? If yes, that's scope drift from Codex — strip it out.
-
-### Deciding to continue
-
-**Continue** when:
-- Codex raised a substantive concern and you have a real answer or counter-argument.
-- An OPEN QUESTION from Codex actually matters for the outcome.
-- A new angle emerged that you haven't explored together yet.
-- You disagree with Codex on something material and want to resolve it.
-
-**Stop** when:
-- You've reached consensus, or the remaining differences are taste/preference.
-- Codex's latest response is mostly confirmation without new content.
-- Further rounds would only polish, not change the outcome.
-- The user's original question is sufficiently answered.
+If Codex's framing genuinely adds value, surface it as an explicit option to the user, do not silently inherit it.
 
 ### Continuing a round
 
-Codex remembers everything. Send **only the delta**, not the full proposal/question:
+Codex remembers everything. Send **only the delta**:
 
-- Critique: `"Addressed X by [change]. Kept Y because [reason]. On your concern about Z — I think it doesn't apply here because [specific reason]. Still open: [if any]."`
-- Consult: `"Leaning toward [X] because [reason]. Not convinced by [Codex's suggestion] because [reason]. Still unsure about [specific aspect]."`
+- Critique: "Addressed X by [change]. Kept Y because [reason]. On Z — I think it doesn't apply because [specific reason]. Still open: [if any]."
+- Consult: "Leaning toward [X] because [reason]. Not convinced by [your suggestion] because [reason]. Still unsure about [aspect]."
 
-### Synthesis — what the user sees
+## Final synthesis
 
-After the debate ends, present the user with a concise summary. The intermediate rounds stay hidden unless the user explicitly asks for them.
+When the debate converges, give the user a brief wrap-up:
 
-**For critique:**
-1. **Final plan** — the refined, review-tested version
-2. **New angles Codex surfaced** — perspectives you had not considered, that genuinely changed the plan
-3. **Codex concerns I rejected** — points that failed the validation filters (not specific enough, theoretical risk, misread the proposal, etc.), with explicit reasoning
-4. **Where Codex and I differed** — any unresolved disagreements, with your reasoning
-5. **Accepted risks** — things Codex flagged that you chose to keep, and why
+**Critique:**
+- Final plan (what you'll do)
+- New angles Codex surfaced that genuinely changed the plan
+- Codex points you rejected and why
+- Any unresolved disagreements
 
-**For consult:**
-1. **Decision** — what you settled on
-2. **New angles Codex surfaced** — what perspectives it contributed that shaped the decision
-3. **Codex suggestions I rejected** — explicit list with reasoning, to make the filtering visible
-4. **Why** — your overall reasoning
-5. **Open questions** — anything worth flagging that the discussion didn't resolve
+**Consult:**
+- The decision
+- What Codex contributed that shaped it
+- What you rejected and why
+- Open questions still worth flagging
 
-The synthesis reflects **your** mediated judgment, not just Codex's opinion echoed back.
+The synthesis is **your** mediated judgment, not Codex's opinion echoed back.
 
-## Session Management — Codex remembers everything
+## Session persistence
 
-The MCP server maintains a **persistent Codex thread** within a Claude Code session. This has important implications:
+The MCP server keeps a persistent Codex thread per session. Within a session, every call resumes the same thread — Codex sees prior debates and accumulates project context. Only call `reset` when switching to an unrelated project or when the thread becomes confused.
 
-**Within a debate (rounds 1-3):**
-- Codex sees the full conversation history — every prior round in the current debate.
-- In Round 2+, do NOT resend the full proposal. Only send what changed and why. Codex already has the original.
-- Example Round 2 message: "Addressed your concerns: switched from SQLite to PostgreSQL for write concurrency. Kept Redis for presence. Added CRDT snapshotting strategy every 100 ops." — NOT the entire plan again.
+## Error handling
 
-**Across debates (multiple planning sessions):**
-- The thread persists across all debates in a single Claude Code session.
-- Codex accumulates context from all prior debates in the project.
-- You can reference earlier debates: "Similar to what we discussed for the auth module, but applied to the payment flow."
-- This means later debates are richer — Codex understands the project's evolving architecture.
+If an MCP call fails (Codex not installed, timeout, etc.):
 
-**When to reset:**
-- Only call `mcp__counterpoint__reset` when starting a completely unrelated project context or when the thread becomes too long/confused.
-- Do NOT reset between debates within the same project — the accumulated context is valuable.
-
-## Error Handling
-
-If an MCP tool call fails (Codex not installed, timeout, etc.):
-- Report the error to the user
-- Suggest running `npm install -g @openai/codex` if Codex is missing
-- Continue with your plan but note it was not stress-tested
+- Tell the user what failed.
+- Suggest `npm install -g @openai/codex` if Codex is missing.
+- Continue without counterpoint — note that the decision was not stress-tested.

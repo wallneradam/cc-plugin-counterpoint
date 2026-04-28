@@ -8,7 +8,6 @@ const DATA_DIR = process.env.CLAUDE_PLUGIN_DATA || os.tmpdir();
 
 export const THREAD_FILE = path.join(DATA_DIR, `counterpoint-${SESSION_ID}.thread`);
 export const RESPONSE_FILE = path.join(DATA_DIR, `counterpoint-${SESSION_ID}-response.txt`);
-export const AUTO_CONSULT_FILE = path.join(DATA_DIR, `counterpoint-${SESSION_ID}.auto-consult`);
 export const TIMEOUT_MS = Number(process.env.COUNTERPOINT_TIMEOUT_MS) || 900_000;
 export const VALID_EFFORTS = new Set(["medium", "high", "xhigh"]);
 
@@ -111,25 +110,6 @@ export function clearThreadId() {
   try {
     fs.unlinkSync(RESPONSE_FILE);
   } catch {}
-}
-
-export function isAutoConsult() {
-  try {
-    return fs.existsSync(AUTO_CONSULT_FILE);
-  } catch {
-    return false;
-  }
-}
-
-export function setAutoConsult(on) {
-  if (on) {
-    fs.mkdirSync(path.dirname(AUTO_CONSULT_FILE), { recursive: true });
-    fs.writeFileSync(AUTO_CONSULT_FILE, new Date().toISOString(), "utf8");
-  } else {
-    try {
-      fs.unlinkSync(AUTO_CONSULT_FILE);
-    } catch {}
-  }
 }
 
 function runCodex(codexBin, args, promptText) {
