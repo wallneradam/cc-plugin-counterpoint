@@ -4,7 +4,9 @@ description: >
   Collaborative review and problem-solving with Codex CLI via the counterpoint MCP server.
   Invoke ONLY when the user explicitly asks — through `/counterpoint`, `/consult`, or a direct
   request for a second opinion. Do NOT invoke proactively, do NOT invoke "before finalizing",
-  do NOT treat any other situation as a trigger.
+  do NOT treat any other situation as a trigger. EXCEPTION: when the user has turned on
+  auto-consult mode via `/consult_on`, consult Codex on every significant decision until
+  `/consult_off` (see "Auto-consult mode" section below).
 allowed-tools: mcp__counterpoint__*, Read, Glob, Grep
 ---
 
@@ -31,12 +33,14 @@ If the user did not ask, do not invoke.
 
 Codex is a **source of outside perspective**, not an authority. It has no access to the codebase, no view of project context beyond what you put in the prompt. Its observations are **hypotheses for you to validate against the actual code** — not verdicts to apply.
 
-| MCP tool                        | Purpose                                 |
-|---------------------------------|-----------------------------------------|
-| `mcp__counterpoint__critique`   | Review a concrete proposal              |
-| `mcp__counterpoint__consult`    | Think through an uncertain problem      |
-| `mcp__counterpoint__status`     | Check the active thread                 |
-| `mcp__counterpoint__reset`     | Clear the thread (rare)                 |
+| MCP tool                          | Purpose                                                       |
+|-----------------------------------|---------------------------------------------------------------|
+| `mcp__counterpoint__critique`     | Review a concrete proposal                                    |
+| `mcp__counterpoint__consult`      | Think through an uncertain problem                            |
+| `mcp__counterpoint__status`       | Check the active thread and auto-consult state                |
+| `mcp__counterpoint__reset`        | Clear the thread (rare)                                       |
+| `mcp__counterpoint__consult_on`   | Turn on auto-consult mode (set via `/consult_on`)             |
+| `mcp__counterpoint__consult_off`  | Turn off auto-consult mode (set via `/consult_off`)           |
 
 Always use these MCP tools directly. Do NOT substitute `codex-rescue` or any other Codex agent — those create disconnected one-shot sessions and lose the thread memory that makes counterpoint useful.
 
@@ -136,6 +140,23 @@ When the debate converges, give the user a brief wrap-up:
 - Open questions still worth flagging
 
 The synthesis is **your** mediated judgment, not Codex's opinion echoed back.
+
+## Auto-consult mode
+
+A binary, user-toggled mode that flips counterpoint from manual to always-on for this session.
+
+- The user enables it by running `/consult_on` (calls `mcp__counterpoint__consult_on` — writes a flag file in `CLAUDE_PLUGIN_DATA`).
+- The user disables it by running `/consult_off`.
+- Check the current state with `mcp__counterpoint__status` if you are unsure — it reports `autoConsult: true|false`.
+
+**While auto-consult mode is ON:**
+
+- Before every implementation plan, design decision, or significant code change → call `mcp__counterpoint__consult` with the proposal.
+- Before every architectural choice or non-trivial trade-off → call `mcp__counterpoint__critique`.
+- Exceptions: trivial single-line edits, direct execution of an already-consulted plan, or when the user explicitly says "skip"/"just do it".
+- All other counterpoint rules still apply: **summarize Codex's response in chat after every call**, defend your position against generic points, strip out unrequested workstream/phase framing, pursue multi-round dialogue when there is real disagreement.
+
+**Important distinction:** Auto-consult mode is *user-controlled*, not model-driven. Claude does not turn it on or off based on heuristics — only the user does, via the slash commands. Do NOT try to be clever about "should I consult here?" outside auto-consult mode; outside it, follow the explicit-invocation-only rule above.
 
 ## Session persistence
 

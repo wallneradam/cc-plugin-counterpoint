@@ -1,5 +1,5 @@
 {
   "name": "counterpoint",
-  "version": "2.0.0",
-  "description": "Manual collaborative review with Codex — invoked explicitly, multi-round dialogue, chat-visible summaries"
+  "version": "2.1.0",
+  "description": "Manual collaborative review with Codex — invoked explicitly, multi-round dialogue, chat-visible summaries; optional user-toggled auto-consult mode (/consult_on, /consult_off)"
 }

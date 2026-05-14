@@ -7,6 +7,8 @@ import {
   runSession,
   readThreadId,
   clearThreadId,
+  isAutoConsult,
+  setAutoConsult,
   VALID_EFFORTS,
 } from "./lib/codex-session.mjs";
 
@@ -21,7 +23,7 @@ Counterpoint is an iterative, peer-to-peer collaborative review loop with Codex 
 The user does NOT see the raw response from these tools — MCP results are visible to the assistant only. After every call, summarize Codex's response in chat for the user, and only reference points that appear in your summary.`.trim();
 
 const server = new McpServer(
-  { name: "counterpoint", version: "2.0.0" },
+  { name: "counterpoint", version: "2.1.0" },
   { capabilities: { tools: {} } }
 );
 
@@ -75,17 +77,51 @@ server.registerTool(
   "status",
   {
     title: "Counterpoint thread status",
-    description: "Report the active Codex thread ID (if any).",
+    description: "Report the active Codex thread ID and whether auto-consult mode is on.",
     inputSchema: {},
   },
   async () => {
     const threadId = readThreadId();
-    const text = threadId
-      ? `Active thread: ${threadId}`
-      : "No active counterpoint thread.";
+    const autoConsult = isAutoConsult();
+    const lines = [
+      threadId ? `Active thread: ${threadId}` : "No active counterpoint thread.",
+      `Auto-consult: ${autoConsult ? "ON" : "off"}`,
+    ];
     return {
-      content: [{ type: "text", text }],
-      structuredContent: { threadId },
+      content: [{ type: "text", text: lines.join("\n") }],
+      structuredContent: { threadId, autoConsult },
+    };
+  }
+);
+
+server.registerTool(
+  "consult_on",
+  {
+    title: "Enable auto-consult mode",
+    description: "Turn on auto-consult mode for this session. From this point Claude is expected to consult Codex (via `critique` or `consult`) on every significant decision until `consult_off` is called. This is a user-toggled persistent flag — it does NOT trigger any consultations on its own; it instructs the assistant to consult.",
+    inputSchema: {},
+  },
+  async () => {
+    setAutoConsult(true);
+    return {
+      content: [{ type: "text", text: "Auto-consult mode: ON" }],
+      structuredContent: { autoConsult: true },
+    };
+  }
+);
+
+server.registerTool(
+  "consult_off",
+  {
+    title: "Disable auto-consult mode",
+    description: "Turn off auto-consult mode for this session. Counterpoint reverts to fully manual — only invoked when the user explicitly asks.",
+    inputSchema: {},
+  },
+  async () => {
+    setAutoConsult(false);
+    return {
+      content: [{ type: "text", text: "Auto-consult mode: off" }],
+      structuredContent: { autoConsult: false },
     };
   }
 );
