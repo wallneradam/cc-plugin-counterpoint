@@ -27,7 +27,7 @@ Three modes for different situations:
 3. **Claude** verifies every finding against the code before accepting it — findings are hypotheses, not verdicts
 4. After fixes or pushback, the next round continues the **same Codex thread**: Codex re-inspects the current code, verifies the claimed fixes itself, and updates each finding's status (`resolved` / `still-open` / `revised` / `withdrawn`). A false positive rejected once stays withdrawn.
 
-For hands-off cleanup there is an autonomous loop (`/counterpoint:review_loop`): review → verify → fix → report back to Codex → re-review, repeated until Codex approves or the loop converges. Each iteration runs in a fresh sub-agent, but all iterations share one persistent Codex review thread — which is why it converges in a few rounds instead of re-litigating the same findings forever.
+For hands-off cleanup there is an autonomous loop command (`/counterpoint:review_loop`): review → verify → fix → report back to Codex → re-review, repeated until Codex approves or the loop converges. Each iteration runs in a fresh sub-agent, but all iterations share one persistent Codex review thread — which is why it converges in a few rounds instead of re-litigating the same findings forever.
 
 Each round produces a visible summary in chat — you see the dialogue evolve, not just the final synthesis.
 

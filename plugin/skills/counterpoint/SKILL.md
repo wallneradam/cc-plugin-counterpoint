@@ -139,7 +139,7 @@ Codex remembers everything. Send **only the delta**:
 
 The persistent thread is what makes this better than one-shot reviewers: false positives are rejected once, fixes are verified in context, and finding ids stay stable across the whole conversation.
 
-For an autonomous review → verify → fix → re-review cycle, use the **counterpoint-review-loop** skill (`/counterpoint:review_loop`) — never improvise your own loop inline.
+For an autonomous review → verify → fix → re-review cycle, use the `/counterpoint:review_loop` command — never improvise your own loop inline.
 
 ## Final synthesis
 
