@@ -7,10 +7,12 @@ import {
   runSession,
   readThreadId,
   clearThreadId,
+  hasReviewed,
   isAutoConsult,
   setAutoConsult,
   VALID_EFFORTS,
 } from "./lib/codex-session.mjs";
+import { composeReviewRequest } from "./lib/git-scope.mjs";
 
 const effortSchema = z
   .enum([...VALID_EFFORTS])
@@ -23,7 +25,7 @@ Counterpoint is an iterative, peer-to-peer collaborative review loop with Codex 
 The user does NOT see the raw response from these tools — MCP results are visible to the assistant only. After every call, summarize Codex's response in chat for the user, and only reference points that appear in your summary.`.trim();
 
 const server = new McpServer(
-  { name: "counterpoint", version: "2.1.0" },
+  { name: "counterpoint", version: "2.2.0" },
   { capabilities: { tools: {} } }
 );
 
@@ -65,6 +67,56 @@ server.registerTool(
   },
   async ({ question, effort }) => {
     const { response } = await runSession("consult", question, effort);
+    return {
+      content: [
+        { type: "text", text: response },
+      ],
+    };
+  }
+);
+
+server.registerTool(
+  "review",
+  {
+    title: "Code review with Codex",
+    description: `Run a rigorous code review with Codex. Two ways to define the scope: git-based (\`scope\`/\`base\`: working tree or branch diff) or path-based (\`paths\`: review the listed files/directories as they exist on disk — works for already-committed code and needs no dirty git state). Codex inspects the code itself (read-only) and returns structured JSON findings (id, severity P1-P3, file, lines, confidence, recommendation) plus an approve/needs-attention verdict.\n\nMulti-round by design: after fixes or pushback, call again with \`reply\` — Codex re-inspects the current code, verifies claimed fixes, and updates every prior finding's status (resolved / still-open / revised / withdrawn). Withdrawn false positives stay withdrawn; finding ids are stable across rounds.\n\nReview findings are hypotheses, not verdicts — verify each against the code before fixing anything.\n\n${COUNTERPOINT_NATURE}`,
+    inputSchema: {
+      scope: z
+        .enum(["auto", "working-tree", "branch"])
+        .describe("What to review. auto (default): working tree if dirty, else branch diff against the default branch.")
+        .optional(),
+      base: z
+        .string()
+        .describe("Explicit base ref for a branch diff (implies branch scope).")
+        .optional(),
+      paths: z
+        .array(z.string())
+        .describe("Path-based scope: files and/or directories to review as they currently exist on disk, independent of git state. Overrides scope/base.")
+        .optional(),
+      focus: z
+        .string()
+        .describe("Optional focus areas or extra review instructions for the first round.")
+        .optional(),
+      reply: z
+        .string()
+        .describe("Round 2+: your response to Codex's previous findings — fix report, pushback, questions. Omit on the first round.")
+        .optional(),
+      effort: effortSchema,
+    },
+  },
+  async ({ scope, base, paths, focus, reply, effort }) => {
+    const followup = Boolean(reply) && hasReviewed();
+    const request = composeReviewRequest(process.cwd(), { scope, base, paths, focus, reply, followup });
+
+    if (!followup && request.empty) {
+      return {
+        content: [
+          { type: "text", text: `Nothing to review: ${request.label} is empty.` },
+        ],
+      };
+    }
+
+    const { response } = await runSession("review", request.text, effort);
     return {
       content: [
         { type: "text", text: response },

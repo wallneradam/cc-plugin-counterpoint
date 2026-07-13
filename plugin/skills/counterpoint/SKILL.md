@@ -18,7 +18,8 @@ allowed-tools: mcp__counterpoint__*, Read, Glob, Grep
 
 - `/counterpoint <proposal>` — critique mode
 - `/consult <question>` — consult mode
-- "Ask Codex what it thinks", "Get a second opinion", "Run this by Codex"
+- `/counterpoint:review` — review mode (code review of the local git state)
+- "Ask Codex what it thinks", "Get a second opinion", "Run this by Codex", "Have Codex review this"
 
 That's it. Do NOT invoke:
 
@@ -31,12 +32,13 @@ If the user did not ask, do not invoke.
 
 ## What Codex is — and is not
 
-Codex is a **source of outside perspective**, not an authority. It has no access to the codebase, no view of project context beyond what you put in the prompt. Its observations are **hypotheses for you to validate against the actual code** — not verdicts to apply.
+Codex is a **source of outside perspective**, not an authority. In critique and consult modes it sees only what you put in the prompt; in review mode it inspects the repository itself (read-only). Either way, its observations are **hypotheses for you to validate against the actual code** — not verdicts to apply.
 
 | MCP tool                          | Purpose                                                       |
 |-----------------------------------|---------------------------------------------------------------|
 | `mcp__counterpoint__critique`     | Review a concrete proposal                                    |
 | `mcp__counterpoint__consult`      | Think through an uncertain problem                            |
+| `mcp__counterpoint__review`       | Code review of the local git state (structured findings)      |
 | `mcp__counterpoint__status`       | Check the active thread and auto-consult state                |
 | `mcp__counterpoint__reset`        | Clear the thread (rare)                                       |
 | `mcp__counterpoint__consult_on`   | Turn on auto-consult mode (set via `/consult_on`)             |
@@ -122,6 +124,22 @@ Codex remembers everything. Send **only the delta**:
 
 - Critique: "Addressed X by [change]. Kept Y because [reason]. On Z — I think it doesn't apply because [specific reason]. Still open: [if any]."
 - Consult: "Leaning toward [X] because [reason]. Not convinced by [your suggestion] because [reason]. Still unsure about [aspect]."
+
+## Review mode
+
+`mcp__counterpoint__review` is a real code review — not a proposal critique. The scope is either git-based (`auto`: working tree if dirty, else branch diff against the default branch; or explicit `scope`/`base`) or path-based (`paths`: the listed files/directories as they exist on disk, independent of git state — for already-committed code, whole modules, or anything a diff can't express). Codex inspects the code itself with read-only access. The response is structured JSON: `verdict` (approve/needs-attention), `summary`, and `findings` with stable ids, severity (P1/P2/P3), file/lines, confidence, body, recommendation.
+
+**Protocol:**
+
+1. Call the tool (pass `focus` for specific concerns; `effort` as for other modes).
+2. Summarize in chat: verdict + one line per finding (`id severity file:line — title`). The user does not see the raw result.
+3. **Verify every finding against the code** before treating it as real. Confidence scores are heuristic. Classify each as real / false positive / uncertain, and say so in chat.
+4. Review calls are **review-only** by default — do not fix findings unless the user asks.
+5. Multi-round: after fixes or when you disagree, call `review` again with `reply` (fix report and/or pushback, addressed by finding id). Codex re-inspects the current code — it verifies claimed fixes itself — and returns every prior open finding with a status: `resolved`, `still-open`, `revised`, or `withdrawn`, plus `new` ones. Withdrawn findings stay withdrawn; do not re-litigate them.
+
+The persistent thread is what makes this better than one-shot reviewers: false positives are rejected once, fixes are verified in context, and finding ids stay stable across the whole conversation.
+
+For an autonomous review → verify → fix → re-review cycle, use the **counterpoint-review-loop** skill (`/counterpoint:review_loop`) — never improvise your own loop inline.
 
 ## Final synthesis
 

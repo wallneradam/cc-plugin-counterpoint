@@ -9,6 +9,7 @@ const DATA_DIR = process.env.CLAUDE_PLUGIN_DATA || os.tmpdir();
 export const THREAD_FILE = path.join(DATA_DIR, `counterpoint-${SESSION_ID}.thread`);
 export const RESPONSE_FILE = path.join(DATA_DIR, `counterpoint-${SESSION_ID}-response.txt`);
 export const AUTO_CONSULT_FILE = path.join(DATA_DIR, `counterpoint-${SESSION_ID}.auto-consult`);
+export const REVIEWED_FILE = path.join(DATA_DIR, `counterpoint-${SESSION_ID}.reviewed`);
 export const TIMEOUT_MS = Number(process.env.COUNTERPOINT_TIMEOUT_MS) || 900_000;
 export const VALID_EFFORTS = new Set(["medium", "high", "xhigh"]);
 
@@ -68,9 +69,77 @@ Same structure (UNDERSTANDING / OPTIONS / RECOMMENDATION / OPEN QUESTIONS) where
 
 `;
 
+const REVIEW_OUTPUT_CONTRACT = `OUTPUT CONTRACT — respond with a single fenced \`\`\`json block and nothing else, matching:
+{
+  "verdict": "approve" | "needs-attention",
+  "summary": "2-4 sentence overall assessment — include what is done well, not only the problems",
+  "findings": [
+    {
+      "id": "F1",
+      "status": "new" | "still-open" | "revised" | "resolved" | "withdrawn",
+      "severity": "P1" | "P2" | "P3",
+      "title": "short defect statement",
+      "file": "path/relative/to/repo/root",
+      "line_start": 1,
+      "line_end": 1,
+      "confidence": 0.85,
+      "body": "what can go wrong, why this code path is vulnerable, likely impact",
+      "recommendation": "concrete change that reduces the risk"
+    }
+  ],
+  "open_questions": ["anything you would need answered to firm up an uncertain finding — empty if none"]
+}
+Rules:
+- Finding ids are stable for the whole review conversation. Never reuse an id for a different issue; number new findings after the highest id used so far.
+- Severity: P1 = must fix before shipping, P2 = should fix, P3 = worth fixing.
+- Use "approve" only when no material finding remains open. Use "needs-attention" if anything is worth blocking on.
+- Ground every finding in code you actually inspected. If a conclusion rests on inference, say so in the body and keep the confidence honest.
+- Prefer one strong finding over several weak ones. If the change is safe, say so in the summary and return an empty findings array.`;
+
+const REVIEW_PREAMBLE = `You are an experienced colleague performing a rigorous code review for a trusted teammate. You share the same goal: nothing broken ships, and good work gets recognized. Be direct and thorough about real problems — that is what your colleague needs from you — but stay collegial: no scorn, no nitpicking theater.
+
+You are running inside the project with read-only access. The scope block at the end tells you WHAT to review; inspect it yourself — read-only git commands (git diff, git show, git log) when the scope is a diff, reading the listed files directly when the scope is a set of paths — and read the surrounding source as deeply as needed. Do not judge from the summary alone. Check CLAUDE.md / AGENTS.md for project conventions before flagging something as wrong.
+
+Prioritize failures that are expensive, dangerous, or hard to detect:
+- broken correctness: logic errors, violated invariants, unhandled failure paths
+- data loss, corruption, duplication, irreversible state changes
+- races, ordering assumptions, stale state, re-entrancy, partial failure and retry gaps
+- boundary behavior: empty/null/timeout inputs, degraded dependencies
+- security: auth, permissions, trust boundaries, injection
+- compatibility: schema drift, version skew, migration hazards
+
+Report only material findings. No style feedback, naming preferences, or speculative concerns without evidence. Every finding must answer: what can go wrong, why this code path is vulnerable, what the likely impact is, and what concrete change would fix it.
+
+${REVIEW_OUTPUT_CONTRACT}
+
+---
+
+Review scope:
+
+`;
+
+const REVIEW_FOLLOWUP_PREAMBLE = `Your colleague responded to your code review — with fixes applied, pushback, or questions. This is the same review conversation: your previous findings and their ids are the baseline.
+
+Re-inspect the CURRENT state of the code — re-read the scoped files and use read-only git commands where relevant; the code may have changed since your last look. Verify claimed fixes in the actual code; never mark a finding resolved on your colleague's word alone. Weigh pushback on its merits: withdraw findings that turn out to be mistaken or intentional behavior, keep the ones that still stand and say why. Also check whether the fixes introduced any new problems.
+
+${REVIEW_OUTPUT_CONTRACT}
+
+Status rules for this round:
+- Every finding still open at the end of the previous round MUST reappear exactly once with status "resolved", "still-open", "revised", or "withdrawn".
+- Newly discovered issues get fresh ids with status "new".
+- Findings already reported as resolved or withdrawn in an EARLIER round are omitted entirely.
+- Do not re-open a withdrawn finding without new evidence.
+
+---
+
+Your colleague's response:
+
+`;
+
 export const PREAMBLES = {
   critique: { initial: CRITIQUE_PREAMBLE, followup: CRITIQUE_FOLLOWUP_PREAMBLE },
   consult: { initial: CONSULT_PREAMBLE, followup: CONSULT_FOLLOWUP_PREAMBLE },
+  review: { initial: REVIEW_PREAMBLE, followup: REVIEW_FOLLOWUP_PREAMBLE },
 };
 
 export function findCodexBin() {
@@ -111,6 +180,22 @@ export function clearThreadId() {
   try {
     fs.unlinkSync(RESPONSE_FILE);
   } catch {}
+  try {
+    fs.unlinkSync(REVIEWED_FILE);
+  } catch {}
+}
+
+export function hasReviewed() {
+  try {
+    return fs.existsSync(REVIEWED_FILE);
+  } catch {
+    return false;
+  }
+}
+
+export function markReviewed() {
+  fs.mkdirSync(path.dirname(REVIEWED_FILE), { recursive: true });
+  fs.writeFileSync(REVIEWED_FILE, "reviewed", "utf8");
 }
 
 export function isAutoConsult() {
@@ -207,7 +292,11 @@ export async function runSession(mode, text, effort) {
 
   const existingThread = readThreadId();
   const isResume = Boolean(existingThread);
-  const prompt = isResume ? preamble.followup + text : preamble.initial + text;
+  // Review followup only makes sense when the resumed thread already contains
+  // a review round — a consult/critique thread getting its first review still
+  // needs the initial review preamble.
+  const useFollowup = mode === "review" ? isResume && hasReviewed() : isResume;
+  const prompt = useFollowup ? preamble.followup + text : preamble.initial + text;
 
   fs.mkdirSync(path.dirname(RESPONSE_FILE), { recursive: true });
   try {
@@ -216,34 +305,45 @@ export async function runSession(mode, text, effort) {
 
   const args = [];
   if (isResume) {
-    args.push("exec", "resume", existingThread, "-");
+    // `exec resume` does not accept `--sandbox`; the config override is the
+    // supported way to force the sandbox on resumed sessions.
+    args.push("exec", "resume", existingThread, "-", "-c", 'sandbox_mode="read-only"');
   } else {
-    args.push("exec", "-");
+    args.push("exec", "-", "--sandbox", "read-only");
   }
-  args.push("--json", "--sandbox", "read-only", "--output-last-message", RESPONSE_FILE);
+  args.push("--json", "--output-last-message", RESPONSE_FILE);
   if (effort) {
     args.push("-c", `model_reasoning_effort="${effort}"`);
   }
 
   let result;
+  let fallbackFresh = false;
   try {
     result = await runCodex(codexBin, args, prompt);
   } catch (err) {
-    if (isResume) {
-      clearThreadId();
-      const freshArgs = [
-        "exec", "-",
-        "--json", "--sandbox", "read-only",
-        "--output-last-message", RESPONSE_FILE,
-        ...(effort ? ["-c", `model_reasoning_effort="${effort}"`] : []),
-      ];
-      result = await runCodex(codexBin, freshArgs, preamble.initial + text);
-    } else {
+    if (!isResume) {
       throw err;
     }
+    if (useFollowup && mode === "review") {
+      // A fresh thread cannot preserve finding ids or statuses, and the
+      // failure may be transient (timeout, network) — keep the thread and
+      // marker files so the round can simply be retried.
+      throw new Error(
+        `Codex thread could not be resumed (${err.message}). The review thread was preserved — retry the round, or run reset to start a fresh review.`
+      );
+    }
+    clearThreadId();
+    const freshArgs = [
+      "exec", "-",
+      "--json", "--sandbox", "read-only",
+      "--output-last-message", RESPONSE_FILE,
+      ...(effort ? ["-c", `model_reasoning_effort="${effort}"`] : []),
+    ];
+    fallbackFresh = true;
+    result = await runCodex(codexBin, freshArgs, preamble.initial + text);
   }
 
-  if (result.threadId && !isResume) {
+  if (result.threadId && (!isResume || fallbackFresh)) {
     writeThreadId(result.threadId);
   }
 
@@ -255,6 +355,10 @@ export async function runSession(mode, text, effort) {
   if (!response) {
     const detail = result.stderr?.trim() || "Codex produced no output";
     throw new Error(`Codex returned an empty response. stderr: ${detail}`);
+  }
+
+  if (mode === "review") {
+    markReviewed();
   }
 
   return { response, threadId: result.threadId || existingThread, resumed: isResume };
