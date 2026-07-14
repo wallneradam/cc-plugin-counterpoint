@@ -23,7 +23,7 @@ Three modes for different situations:
 ### Review — stateful code review of your git changes
 
 1. The plugin resolves the review scope from git (working tree if dirty, otherwise branch diff against the default branch — or an explicit `--scope` / `--base`), or reviews explicitly listed files/directories as they exist on disk (`--path`, repeatable) — useful for already-committed code, whole modules, or anything a diff can't express
-2. **Codex** inspects the actual diff and surrounding code itself (read-only) and returns structured findings: stable id, severity (P1–P3), file/lines, confidence, concrete recommendation, plus an approve / needs-attention verdict
+2. **Codex** inspects the actual diff and surrounding code itself (read-only) and returns structured findings: stable id, origin (`in-change` / `pre-existing`), severity (P1–P3), file/lines, confidence, concrete recommendation, plus an approve / needs-attention verdict. Pre-existing bugs count too — a real defect in the surrounding code is reported even if this change did not introduce it; "it was already there" is never grounds to dismiss it
 3. **Claude** verifies every finding against the code before accepting it — findings are hypotheses, not verdicts
 4. After fixes or pushback, the next round continues the **same Codex thread**: Codex re-inspects the current code, verifies the claimed fixes itself, and updates each finding's status (`resolved` / `still-open` / `revised` / `withdrawn`). A false positive rejected once stays withdrawn.
 

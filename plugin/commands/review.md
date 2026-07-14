@@ -13,8 +13,8 @@ Argument handling:
 
 Protocol (see the counterpoint skill's "Review mode" section for the full rules):
 1. Call `mcp__counterpoint__review` with the parsed parameters.
-2. Parse the JSON findings from the response. Summarize them in chat — one line per finding (`id severity file:line — title`), plus the verdict. The user cannot see the raw MCP result.
-3. **Verify each finding against the actual code** before accepting it (Read/Grep the cited locations). Classify: real / false positive / uncertain — and say so in chat.
+2. Parse the JSON findings from the response. Summarize them in chat — one line per finding (`id severity file:line — title`), plus the verdict. Mark findings whose `origin` is `pre-existing` (a real bug in the surrounding code that predates this change) — Codex reports these as full findings, and they are real bugs, not dismissable because they were already there. The user cannot see the raw MCP result.
+3. **Verify each finding against the actual code** before accepting it (Read/Grep the cited locations). Classify: real / false positive / uncertain — and say so in chat. A `pre-existing` finding is verified the same way; being pre-existing is not grounds to treat it as a false positive.
 4. This command is **review-only**: do NOT fix anything unless the user asks. If there are false positives or you have pushback, send a follow-up round via the `reply` parameter so Codex re-evaluates and updates finding statuses.
 5. If the user wants findings fixed automatically, point them to `/counterpoint:review_loop`.
 

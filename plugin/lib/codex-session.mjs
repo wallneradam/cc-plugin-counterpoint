@@ -77,6 +77,7 @@ const REVIEW_OUTPUT_CONTRACT = `OUTPUT CONTRACT — respond with a single fenced
     {
       "id": "F1",
       "status": "new" | "still-open" | "revised" | "resolved" | "withdrawn",
+      "origin": "in-change" | "pre-existing",
       "severity": "P1" | "P2" | "P3",
       "title": "short defect statement",
       "file": "path/relative/to/repo/root",
@@ -91,7 +92,8 @@ const REVIEW_OUTPUT_CONTRACT = `OUTPUT CONTRACT — respond with a single fenced
 }
 Rules:
 - Finding ids are stable for the whole review conversation. Never reuse an id for a different issue; number new findings after the highest id used so far.
-- Severity: P1 = must fix before shipping, P2 = should fix, P3 = worth fixing.
+- origin: "in-change" for a defect in what this change touched; "pre-existing" for a real bug in the surrounding code that predates this change. Report pre-existing bugs — "it was already there" / "not introduced by this change" is NEVER a reason to omit a real defect. Mark it "pre-existing" and treat it as a finding like any other.
+- Severity: P1 = must fix before shipping, P2 = should fix, P3 = worth fixing. Severity reflects the defect's real impact, not whether it is pre-existing.
 - Use "approve" only when no material finding remains open. Use "needs-attention" if anything is worth blocking on.
 - Ground every finding in code you actually inspected. If a conclusion rests on inference, say so in the body and keep the confidence honest.
 - Prefer one strong finding over several weak ones. If the change is safe, say so in the summary and return an empty findings array.`;
@@ -110,6 +112,8 @@ Prioritize failures that are expensive, dangerous, or hard to detect:
 
 Report only material findings. No style feedback, naming preferences, or speculative concerns without evidence. Every finding must answer: what can go wrong, why this code path is vulnerable, what the likely impact is, and what concrete change would fix it.
 
+**Pre-existing bugs count too.** Your goal is real defects in the code you are reviewing — not only the lines this change touched. If, while reviewing the scoped code and the surrounding source it relies on, you find a genuine bug that predates this change, report it as a finding like any other and mark its origin "pre-existing". "It was already there" or "not introduced by this change" is never a reason to stay silent about a real defect. Stay anchored to the scoped code and what it directly touches — do not go auditing the whole repository for unrelated issues — but never suppress a real bug you actually saw.
+
 ${REVIEW_OUTPUT_CONTRACT}
 
 ---
@@ -120,7 +124,7 @@ Review scope:
 
 const REVIEW_FOLLOWUP_PREAMBLE = `Your colleague responded to your code review — with fixes applied, pushback, or questions. This is the same review conversation: your previous findings and their ids are the baseline.
 
-Re-inspect the CURRENT state of the code — re-read the scoped files and use read-only git commands where relevant; the code may have changed since your last look. Verify claimed fixes in the actual code; never mark a finding resolved on your colleague's word alone. Weigh pushback on its merits: withdraw findings that turn out to be mistaken or intentional behavior, keep the ones that still stand and say why. Also check whether the fixes introduced any new problems.
+Re-inspect the CURRENT state of the code — re-read the scoped files and use read-only git commands where relevant; the code may have changed since your last look. Verify claimed fixes in the actual code; never mark a finding resolved on your colleague's word alone. Weigh pushback on its merits: withdraw findings that turn out to be mistaken or intentional behavior, keep the ones that still stand and say why. A finding's origin never changes how it is handled — a "pre-existing" bug is withdrawn only if it turns out not to be a real defect, never merely because it predates the change. Also check whether the fixes introduced any new problems.
 
 ${REVIEW_OUTPUT_CONTRACT}
 

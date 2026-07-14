@@ -92,10 +92,14 @@ Then run:
     node "[plugin root]/scripts/counterpoint.mjs" review [extra args] --reply "<the reply text>"
 
 The response is a fenced JSON block: verdict, summary, findings[] with id,
-status, severity (P1/P2/P3), title, file, line_start/line_end, confidence,
-body, recommendation. Parse it; it is the source of truth. "Nothing to review"
-output → write the empty summary and exit. Open findings for this round =
-findings with status new / still-open / revised (on iteration 1, everything).
+status, origin ("in-change" | "pre-existing"), severity (P1/P2/P3), title, file,
+line_start/line_end, confidence, body, recommendation. Parse it; it is the
+source of truth. "Nothing to review" output → write the empty summary and exit.
+Open findings for this round = findings with status new / still-open / revised
+(on iteration 1, everything). A "pre-existing" finding is a real bug in the
+surrounding code that predates this change — Codex reports these as full
+findings; treat them exactly like in-change findings, do not skip one because it
+was already there.
 
 ================ STEP 2: Verify each open finding ================
 
@@ -113,7 +117,10 @@ If Codex already withdrew or resolved a finding this round, do not re-verify it.
 ================ STEP 3: Fix verified-real findings ================
 
 Apply fixes in-place. NEVER touch git (no add/commit/stash/reset) — the user
-wants the diff reviewable. Re-read each fix point afterwards. Targeted checks
+wants the diff reviewable. Fix verified-real "pre-existing" findings too, exactly
+like in-change ones — being pre-existing is not a reason to leave a real bug
+unfixed (this may extend the diff into code the change did not originally touch;
+that is intended). Re-read each fix point afterwards. Targeted checks
 (single test, linter on the file) are fine; full test suites are not. If a fix
 would require an architecturally large change, reclassify as uncertain and
 explain. For every real finding write a concrete 2-3 sentence change_summary
@@ -136,16 +143,16 @@ NORMAL shape:
   "severity_counts": {"P1": <int>, "P2": <int>, "P3": <int>},
   "real": [
     {"id": "F3", "file": "...", "line_start": N, "line_end": N, "title": "...",
-     "severity": "P1"|"P2"|"P3", "fixed": true|false,
+     "severity": "P1"|"P2"|"P3", "origin": "in-change"|"pre-existing", "fixed": true|false,
      "change_summary": "2-3 sentences, user language, single line"}
   ],
   "false_positives": [
     {"id": "F2", "file": "...", "line_start": N, "line_end": N, "title": "...",
-     "severity": "...", "change_summary": "why it is rejected — goes to Codex next round"}
+     "severity": "...", "origin": "in-change"|"pre-existing", "change_summary": "why it is rejected — goes to Codex next round"}
   ],
   "uncertain": [
     {"id": "F7", "file": "...", "line_start": N, "line_end": N, "title": "...",
-     "severity": "...", "change_summary": "what is unclear and what would decide it"}
+     "severity": "...", "origin": "in-change"|"pre-existing", "change_summary": "what is unclear and what would decide it"}
   ]
 }
 severity_counts covers all OPEN findings this round (real + fp + uncertain).
@@ -175,9 +182,9 @@ Everything the orchestrator prints is in the user's conversation language (ids, 
 
 > Iteration N: X open findings [P1:a P2:b P3:c] → r real (f fixed), p false positives, u uncertain; Codex resolved [ids], withdrew [ids].
 
-…then one line per finding (real fixed first, then real unfixed, false positives, uncertain; P1→P2→P3 within each):
+…then one line per finding (real fixed first, then real unfixed, false positives, uncertain; P1→P2→P3 within each). Append `(pre-existing)` after the title for any finding whose `origin` is `pre-existing`:
 
->   - P1 fixed [F3 src/foo.py:142] Title — change_summary verbatim.
+>   - P1 fixed [F3 src/foo.py:142] Title (pre-existing) — change_summary verbatim.
 
 Zero findings → header line only. No other narration. After the loop, write `final-summary.md` (unresolved findings with one-line notes, in the user's language) and print a 2–3 line closing summary referencing it.
 
