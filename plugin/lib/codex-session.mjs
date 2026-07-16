@@ -262,10 +262,16 @@ function runCodex(codexBin, args, promptText) {
       reject(new Error(`Codex timed out after ${TIMEOUT_MS / 1000}s`));
     }, TIMEOUT_MS);
 
-    child.on("close", (code) => {
+    child.on("close", (code, signal) => {
       clearTimeout(timer);
       if (code !== 0) {
-        const detail = stderr.trim() || `Codex exited with code ${code}`;
+        let detail =
+          stderr.trim() ||
+          (signal ? `Codex was killed by signal ${signal}` : `Codex exited with code ${code}`);
+        if (signal || !stderr.trim()) {
+          detail +=
+            " (hint: if this shell is sandboxed, the sandbox likely killed Codex — it needs network access and spawns its own sandbox; re-run with the sandbox disabled)";
+        }
         reject(new Error(detail));
       } else {
         resolve({ stdout, stderr, threadId, exitCode: code });

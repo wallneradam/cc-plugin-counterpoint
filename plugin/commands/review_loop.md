@@ -74,6 +74,14 @@ The CLI call resumes a persistent Codex thread stored in the workspace. Run it
 via Bash with run_in_background: true (a review can exceed the foreground Bash
 timeout), then poll the output file with BashOutput until the process exits.
 
+The Bash call MUST run with the sandbox disabled (dangerouslyDisableSandbox:
+true). Codex needs network access and spawns its own read-only sandbox — inside
+a sandboxed shell it dies silently, leaving no process and no output. If the
+background process still disappears without producing a response, re-run the
+same command ONCE (sandbox disabled) — the Codex thread is preserved across
+failed rounds, so a retry simply repeats the round. If the retry also dies,
+write the ERROR-shaped JSON with error_kind "review-failed".
+
 Iteration 1 (initial review):
 
   CLAUDE_PLUGIN_DATA="[workspace]" CODEX_COMPANION_SESSION_ID="loop" \
@@ -192,5 +200,6 @@ Zero findings → header line only. No other narration. After the loop, write `f
 
 - Never touch git, in any agent. Non-negotiable.
 - The counterpoint CLI needs the Codex CLI installed (`npm install -g @openai/codex`); if missing, the sub-agent reports `error_kind: "codex-missing"` and the loop stops.
+- The CLI must never run inside a sandboxed Bash call — Codex needs network and its own sandbox. Sub-agents run it with `dangerouslyDisableSandbox: true`; a silently vanishing background process is the signature of a sandboxed launch.
 - The loop's Codex thread lives in the workspace (`CLAUDE_PLUGIN_DATA` override), so it never disturbs the session's own counterpoint thread.
 - Optional arguments (`--scope`, `--base`, `--path` (repeatable), `--effort`) pass through to every review round. With `--path` the loop reviews the listed files/directories as they exist on disk instead of a git diff.
