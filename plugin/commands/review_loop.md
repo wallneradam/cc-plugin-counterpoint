@@ -22,7 +22,7 @@ Do not run the whole loop inside one agent — a long loop accumulates context a
 
 **The orchestrator** (you, the agent running this command):
 - Prepares the workspace (see below).
-- Spawns ONE per-iteration sub-agent at a time via the `Agent` tool, **foreground** (no `run_in_background`), `subagent_type: "general-purpose"`. A sub-agent taking 5–10 minutes is normal — wait for it.
+- Spawns ONE per-iteration sub-agent at a time via the `Agent` tool, **synchronously: pass `run_in_background: false` EXPLICITLY**, `subagent_type: "general-purpose"`. Newer harnesses run agents in the background BY DEFAULT — omitting the flag detaches the worker, the orchestrator's turn ends, and the completion notification may never arrive, silently stalling the loop. A synchronous Agent call blocks and returns the worker's final JSON inline; a sub-agent taking 5–10+ minutes is normal — wait for it.
 - Reads each sub-agent's JSON summary (returned as final message and written to `iteration-NN.json`).
 - Decides continue/stop per the convergence rules.
 - Prints the per-iteration progress output and, at the end, writes `final-summary.md` plus a 2–3 line closing summary.
@@ -81,7 +81,8 @@ never prose, never an empty message.
 
 The CLI call resumes a persistent Codex thread stored in the workspace. A round
 can run 15+ minutes — far beyond the foreground Bash cap — so launch it as ONE
-background Bash call and let the harness wake you when it exits. Never poll.
+background Bash call, then WAIT on it with blocking TaskOutput calls (below).
+Never poll BashOutput, never sleep, and NEVER end your turn while it runs.
 
 LAUNCH — a single Bash call with run_in_background: true AND
 dangerouslyDisableSandbox: true (Codex needs network access and spawns its own
@@ -108,24 +109,33 @@ Then run (same background + redirect form):
     node "[plugin root]/scripts/counterpoint.mjs" review [extra args] --reply "<the reply text>" \
     > "[workspace]/cli-round-[NN].log" 2>&1; echo "EXIT:$?" >> "[workspace]/cli-round-[NN].log"
 
-WAIT — the harness re-invokes you automatically when the background process
-exits. These rules are absolute:
-  - Do NOT poll BashOutput in a loop, do NOT run sleep, do NOT try to detect
-    completion yourself. After launching, if you have nothing else to do,
-    simply end your turn — the completion notification wakes you, however long
-    the round takes.
+WAIT — block on the background task with TaskOutput. Do NOT rely on being
+"woken up" when the process exits: in a sub-agent, ending your turn means you
+are FINISHED — nobody processes the finished round after you return. The wait
+recipe, exactly:
+  1. The background launch's tool result contains a task id. Load the
+     TaskOutput tool if it is deferred: ToolSearch with query
+     "select:TaskOutput".
+  2. Call TaskOutput with that task id, block: true, timeout: 600000. The call
+     returns when the process exits — or after 10 minutes if it is still
+     running.
+  3. If the task has not completed yet, call TaskOutput again with the same
+     arguments. Repeat until the task reports completion. A round taking two
+     or three blocking calls is normal. This repetition is NOT polling — each
+     call blocks server-side; never substitute BashOutput checks or sleep.
   - NEVER write your final message while the round is still running. Returning
     with "the review continues in the background" is a protocol violation —
     nothing continues after you return. Your final message is the iteration
     JSON from STEP 4, nothing else, ever.
 
-ON WAKE-UP — read completion state from the files, not from process heuristics:
+ON COMPLETION — read completion state from the files, not from process heuristics:
   - Success: [workspace]/counterpoint-loop-response.txt is NON-EMPTY. That file
     is Codex's response — parse it (the CLI truncates it at launch and writes
     it only on success, so non-empty means the round finished).
   - Failure: response file empty and/or the log's EXIT line is non-zero. The
     Codex thread is preserved across failed rounds, so re-run the SAME launch
-    command ONCE (background, sandbox disabled). If the retry also fails, write
+    command ONCE (background, sandbox disabled, same blocking TaskOutput
+    wait). If the retry also fails, write
     the ERROR-shaped JSON with error_kind "review-failed" and put the log tail
     in error_message.
 
@@ -229,9 +239,10 @@ Zero findings → header line only. No other narration. After the loop, write `f
 ## Cautions
 
 - Never touch git, in any agent. Non-negotiable.
+- The orchestrator must NEVER end its turn while an iteration is in flight. If a worker spawn accidentally went to the background (the Agent call returned a task id instead of the worker's final JSON), immediately block on it with repeated `TaskOutput` calls (block: true, timeout: 600000) until it completes — do not wait for a notification, it may never arrive.
 - The counterpoint CLI needs the Codex CLI installed (`npm install -g @openai/codex`); if missing, the sub-agent reports `error_kind: "codex-missing"` and the loop stops.
 - The CLI must never run inside a sandboxed Bash call — Codex needs network and its own sandbox. Sub-agents run it with `dangerouslyDisableSandbox: true`; a silently vanishing background process is the signature of a sandboxed launch.
-- Sub-agents wait for the review round by ending their turn and letting the harness wake them on process exit — never by polling BashOutput or sleeping, and never by returning early with a "still running" message. Completion is judged from the response file (non-empty = done), not from process state.
+- Sub-agents wait for the review round with repeated BLOCKING `TaskOutput` calls (block: true, timeout: 600000) on the background task — never by ending their turn (a returned sub-agent is finished; no wake-up comes), never by polling BashOutput or sleeping, and never by returning early with a "still running" message. Completion is judged from the response file (non-empty = done), not from process state.
 - The loop's Codex thread lives in the workspace (`CLAUDE_PLUGIN_DATA` override), so it never disturbs the session's own counterpoint thread.
 - Optional arguments (`--scope`, `--base`, `--path` (repeatable), `--effort`) pass through to every review round. With `--path` the loop reviews the listed files/directories as they exist on disk instead of a git diff.
 - Workspace wipe MUST use the `find` recipe in the Workspace section — never `rm -rf "$CACHE"/*` or any `rm -rf <var>/*` form, even when preparing multiple workspaces for a multi-repo diff. That form trips Claude Code's "possibly-empty variable path" guard and prompts for confirmation, stalling the loop in auto mode.
