@@ -27,7 +27,7 @@ Do not run the whole loop inside one agent — a long loop accumulates context a
 - Decides continue/stop per the convergence rules.
 - Prints the per-iteration progress output and, at the end, writes `final-summary.md` plus a 2–3 line closing summary.
 
-The orchestrator MUST NOT run the counterpoint CLI, read project source, apply fixes, run tests, or touch git. Its only tools: `Bash` for workspace prep, `Read` for iteration JSONs, `Write` for `final-summary.md`, `Agent` for sub-agents. If a sub-agent returns something unparseable, re-spawn that same iteration once; if it fails twice, stop and report.
+The orchestrator MUST NOT run the counterpoint CLI, read project source, apply fixes, run tests, or touch git. Its only tools: `Bash` for workspace prep, `Read` for iteration JSONs, `Write` for `final-summary.md`, `Agent` for sub-agents. If a sub-agent returns something unparseable — including any claim that the review "is still running in the background" or "will continue automatically" (it will not; a returned sub-agent is finished) — re-spawn that same iteration once; if it fails twice, stop and report.
 
 **The per-iteration sub-agent** has a clean context and does one round: run the review (or reply round), verify findings, fix real ones, write and return the summary JSON.
 
@@ -79,22 +79,21 @@ never prose, never an empty message.
 
 ================ STEP 1: Run the review round ================
 
-The CLI call resumes a persistent Codex thread stored in the workspace. Run it
-via Bash with run_in_background: true (a review can exceed the foreground Bash
-timeout), then poll the output file with BashOutput until the process exits.
+The CLI call resumes a persistent Codex thread stored in the workspace. A round
+can run 15+ minutes — far beyond the foreground Bash cap — so launch it as ONE
+background Bash call and let the harness wake you when it exits. Never poll.
 
-The Bash call MUST run with the sandbox disabled (dangerouslyDisableSandbox:
-true). Codex needs network access and spawns its own read-only sandbox — inside
-a sandboxed shell it dies silently, leaving no process and no output. If the
-background process still disappears without producing a response, re-run the
-same command ONCE (sandbox disabled) — the Codex thread is preserved across
-failed rounds, so a retry simply repeats the round. If the retry also dies,
-write the ERROR-shaped JSON with error_kind "review-failed".
+LAUNCH — a single Bash call with run_in_background: true AND
+dangerouslyDisableSandbox: true (Codex needs network access and spawns its own
+read-only sandbox; inside a sandboxed shell it dies silently, leaving no
+process and no output). Redirect all output to a per-round log and append the
+exit code, so completion state is readable from the file afterwards.
 
 Iteration 1 (initial review):
 
   CLAUDE_PLUGIN_DATA="[workspace]" CODEX_COMPANION_SESSION_ID="loop" \
-    node "[plugin root]/scripts/counterpoint.mjs" review [extra args]
+    node "[plugin root]/scripts/counterpoint.mjs" review [extra args] \
+    > "[workspace]/cli-round-[NN].log" 2>&1; echo "EXIT:$?" >> "[workspace]/cli-round-[NN].log"
 
 Iteration 2+ (reply round): compose a reply from the previous iteration's JSON —
 one line per finding, addressed by Codex's finding id:
@@ -103,10 +102,32 @@ one line per finding, addressed by Codex's finding id:
   - false positive:       "F2: we classified this as a false positive — <concrete
                            reason>. Please verify and withdraw or defend it."
   - uncertain:            "F7: uncertain — <what is unclear>. <question to Codex>"
-Then run:
+Then run (same background + redirect form):
 
   CLAUDE_PLUGIN_DATA="[workspace]" CODEX_COMPANION_SESSION_ID="loop" \
-    node "[plugin root]/scripts/counterpoint.mjs" review [extra args] --reply "<the reply text>"
+    node "[plugin root]/scripts/counterpoint.mjs" review [extra args] --reply "<the reply text>" \
+    > "[workspace]/cli-round-[NN].log" 2>&1; echo "EXIT:$?" >> "[workspace]/cli-round-[NN].log"
+
+WAIT — the harness re-invokes you automatically when the background process
+exits. These rules are absolute:
+  - Do NOT poll BashOutput in a loop, do NOT run sleep, do NOT try to detect
+    completion yourself. After launching, if you have nothing else to do,
+    simply end your turn — the completion notification wakes you, however long
+    the round takes.
+  - NEVER write your final message while the round is still running. Returning
+    with "the review continues in the background" is a protocol violation —
+    nothing continues after you return. Your final message is the iteration
+    JSON from STEP 4, nothing else, ever.
+
+ON WAKE-UP — read completion state from the files, not from process heuristics:
+  - Success: [workspace]/counterpoint-loop-response.txt is NON-EMPTY. That file
+    is Codex's response — parse it (the CLI truncates it at launch and writes
+    it only on success, so non-empty means the round finished).
+  - Failure: response file empty and/or the log's EXIT line is non-zero. The
+    Codex thread is preserved across failed rounds, so re-run the SAME launch
+    command ONCE (background, sandbox disabled). If the retry also fails, write
+    the ERROR-shaped JSON with error_kind "review-failed" and put the log tail
+    in error_message.
 
 The response is a fenced JSON block: verdict, summary, findings[] with id,
 status, origin ("in-change" | "pre-existing"), severity (P1/P2/P3), title, file,
@@ -210,6 +231,7 @@ Zero findings → header line only. No other narration. After the loop, write `f
 - Never touch git, in any agent. Non-negotiable.
 - The counterpoint CLI needs the Codex CLI installed (`npm install -g @openai/codex`); if missing, the sub-agent reports `error_kind: "codex-missing"` and the loop stops.
 - The CLI must never run inside a sandboxed Bash call — Codex needs network and its own sandbox. Sub-agents run it with `dangerouslyDisableSandbox: true`; a silently vanishing background process is the signature of a sandboxed launch.
+- Sub-agents wait for the review round by ending their turn and letting the harness wake them on process exit — never by polling BashOutput or sleeping, and never by returning early with a "still running" message. Completion is judged from the response file (non-empty = done), not from process state.
 - The loop's Codex thread lives in the workspace (`CLAUDE_PLUGIN_DATA` override), so it never disturbs the session's own counterpoint thread.
 - Optional arguments (`--scope`, `--base`, `--path` (repeatable), `--effort`) pass through to every review round. With `--path` the loop reviews the listed files/directories as they exist on disk instead of a git diff.
 - Workspace wipe MUST use the `find` recipe in the Workspace section — never `rm -rf "$CACHE"/*` or any `rm -rf <var>/*` form, even when preparing multiple workspaces for a multi-repo diff. That form trips Claude Code's "possibly-empty variable path" guard and prompts for confirmation, stalling the loop in auto mode.
