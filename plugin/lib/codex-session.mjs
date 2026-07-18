@@ -10,8 +10,17 @@ export const THREAD_FILE = path.join(DATA_DIR, `counterpoint-${SESSION_ID}.threa
 export const RESPONSE_FILE = path.join(DATA_DIR, `counterpoint-${SESSION_ID}-response.txt`);
 export const AUTO_CONSULT_FILE = path.join(DATA_DIR, `counterpoint-${SESSION_ID}.auto-consult`);
 export const REVIEWED_FILE = path.join(DATA_DIR, `counterpoint-${SESSION_ID}.reviewed`);
-export const TIMEOUT_MS = Number(process.env.COUNTERPOINT_TIMEOUT_MS) || 900_000;
 export const VALID_EFFORTS = new Set(["medium", "high", "xhigh"]);
+
+const DEFAULT_TIMEOUT_MS = 900_000;
+const EFFORT_TIMEOUT_MS = { medium: 900_000, high: 1_800_000, xhigh: 3_600_000 };
+
+// Higher reasoning effort means longer runs; a single flat budget starved xhigh.
+export function timeoutForEffort(effort) {
+  const override = Number(process.env.COUNTERPOINT_TIMEOUT_MS);
+  if (override) return override;
+  return EFFORT_TIMEOUT_MS[effort] ?? DEFAULT_TIMEOUT_MS;
+}
 
 const CRITIQUE_PREAMBLE = `You are an experienced colleague reviewing a proposal from a trusted teammate. You share the same goal: building the best possible solution together. Approach this as a collaborative review — start by recognizing what is well thought out, then build on it with honest, constructive feedback. Every concern you raise should come with a concrete suggestion for improvement. Your tone should reflect mutual respect: you are helping a peer refine good work, not finding fault.
 
@@ -221,7 +230,7 @@ export function setAutoConsult(on) {
   }
 }
 
-function runCodex(codexBin, args, promptText) {
+function runCodex(codexBin, args, promptText, timeoutMs = DEFAULT_TIMEOUT_MS) {
   return new Promise((resolve, reject) => {
     const child = spawn(codexBin, args, {
       cwd: process.cwd(),
@@ -259,8 +268,8 @@ function runCodex(codexBin, args, promptText) {
 
     const timer = setTimeout(() => {
       child.kill("SIGTERM");
-      reject(new Error(`Codex timed out after ${TIMEOUT_MS / 1000}s`));
-    }, TIMEOUT_MS);
+      reject(new Error(`Codex timed out after ${timeoutMs / 1000}s`));
+    }, timeoutMs);
 
     child.on("close", (code, signal) => {
       clearTimeout(timer);
@@ -326,10 +335,12 @@ export async function runSession(mode, text, effort) {
     args.push("-c", `model_reasoning_effort="${effort}"`);
   }
 
+  const timeoutMs = timeoutForEffort(effort);
+
   let result;
   let fallbackFresh = false;
   try {
-    result = await runCodex(codexBin, args, prompt);
+    result = await runCodex(codexBin, args, prompt, timeoutMs);
   } catch (err) {
     if (!isResume) {
       throw err;
@@ -350,7 +361,7 @@ export async function runSession(mode, text, effort) {
       ...(effort ? ["-c", `model_reasoning_effort="${effort}"`] : []),
     ];
     fallbackFresh = true;
-    result = await runCodex(codexBin, freshArgs, preamble.initial + text);
+    result = await runCodex(codexBin, freshArgs, preamble.initial + text, timeoutMs);
   }
 
   if (result.threadId && (!isResume || fallbackFresh)) {
