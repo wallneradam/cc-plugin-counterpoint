@@ -25,9 +25,9 @@ Do not run the whole loop inside one agent — a long loop accumulates context a
 - Spawns ONE per-iteration sub-agent at a time via the `Agent` tool, **synchronously: pass `run_in_background: false` EXPLICITLY**, `subagent_type: "general-purpose"`. Newer harnesses run agents in the background BY DEFAULT — omitting the flag detaches the worker, the orchestrator's turn ends, and the completion notification may never arrive, silently stalling the loop. A synchronous Agent call blocks and returns the worker's final JSON inline; a sub-agent taking 5–10+ minutes is normal — wait for it.
 - Reads each sub-agent's JSON summary (returned as final message and written to `iteration-NN.json`).
 - Decides continue/stop per the convergence rules.
-- Prints the per-iteration progress output and, at the end, writes `final-summary.md` plus a 2–3 line closing summary.
+- Prints EXACTLY the per-iteration progress output defined below — one stats line plus the worker's 1–3 sentence summary, nothing more — and, at the end, writes `final-summary.md` plus a 2–3 line closing summary.
 
-The orchestrator MUST NOT run the counterpoint CLI, read project source, apply fixes, run tests, or touch git. Its only tools: `Bash` for workspace prep, `Read` for iteration JSONs, `Write` for `final-summary.md`, `Agent` for sub-agents. If a sub-agent returns something unparseable — including any claim that the review "is still running in the background" or "will continue automatically" (it will not; a returned sub-agent is finished) — re-spawn that same iteration once; if it fails twice, stop and report.
+The orchestrator is a relay, never a worker. It MUST NOT run the counterpoint CLI, read project source, verify or re-verify findings, apply fixes, run tests, or touch git — not even when a sub-agent fails or returns something odd. Taking over any part of the review/fix work in the main context is a protocol violation, full stop. Its only tools: `Bash` for workspace prep, `Read` for iteration JSONs, `Write` for `final-summary.md`, `Agent` for sub-agents. If a sub-agent returns something unparseable — including any claim that the review "is still running in the background" or "will continue automatically" (it will not; a returned sub-agent is finished) — re-spawn that same iteration once; if it fails twice, stop and report the error in the closing summary. Never fall back to doing the iteration yourself.
 
 **The per-iteration sub-agent** has a clean context and does one round: run the review (or reply round), verify findings, fix real ones, write and return the summary JSON.
 
@@ -184,6 +184,7 @@ NORMAL shape:
 {
   "iteration": [N],
   "status": "ok",
+  "summary": "1-3 sentences in USER LANGUAGE: what this round found and what you did. The orchestrator prints this verbatim — write it for the user.",
   "verdict": "approve" | "needs-attention",
   "codex_resolved": ["F1", ...],
   "codex_withdrawn": ["F2", ...],
@@ -220,25 +221,28 @@ Stop on any of:
 1. **Approved.** `verdict: "approve"` — or every finding this round is resolved/withdrawn and nothing is open.
 2. **Nothing fixable left.** Every open finding is false-positive or uncertain AND the previous round already reported the same set to Codex (i.e. Codex defended them twice). Escalate to the user instead of arguing forever.
 3. **Stuck.** The set of open real findings (by id) is identical to the previous iteration's AND the current iteration applied no new fix (no `real` entry with `fixed: true`). If a fix WAS applied this round, always run at least one more iteration so Codex can verify it — never stop on a fix Codex has not yet re-inspected.
-4. **Safety cap: 15 iterations.** The stateful thread converges fast; hitting 15 means something structural is wrong.
+4. **Safety cap: 20 iterations.** The stateful thread converges fast; anywhere near 20 means something structural is wrong.
 
 Otherwise spawn the next iteration with the new JSON.
 
-## Progress output
+## Progress output — strict, minimal, standardized
 
-Everything the orchestrator prints is in the user's conversation language (ids, paths, titles, severity tags stay as-is). After each iteration, print one header line:
+Everything the orchestrator prints is in the user's conversation language (ids, paths, titles, severity tags stay as-is). After each iteration, print EXACTLY two things and nothing else:
 
-> Iteration N: X open findings [P1:a P2:b P3:c] → r real (f fixed), p false positives, u uncertain; Codex resolved [ids], withdrew [ids].
+1. One standardized stats line built from the iteration JSON:
 
-…then one line per finding (real fixed first, then real unfixed, false positives, uncertain; P1→P2→P3 within each). Append `(pre-existing)` after the title for any finding whose `origin` is `pre-existing`:
+> Iteration N: X open [P1:a P2:b P3:c] | real: r (fixed: f) | false positive: p | uncertain: u | resolved: [ids] | withdrawn: [ids]
 
->   - P1 fixed [F3 src/foo.py:142] Title (pre-existing) — change_summary verbatim.
+2. The worker's `summary` field, verbatim (it is already 1–3 sentences in the user's language).
 
-Zero findings → header line only. No other narration. After the loop, write `final-summary.md` (unresolved findings with one-line notes, in the user's language) and print a 2–3 line closing summary referencing it.
+That is the WHOLE per-iteration output. Do NOT list findings one by one, do NOT quote change_summary entries, do NOT narrate what you are about to do, do NOT explain the convergence decision — the details are all in `iteration-NN.json` and `final-summary.md` for anyone who wants them. Zero findings → stats line + summary only, same as any round.
+
+After the loop, write `final-summary.md` (per-finding detail: fixes applied, unresolved findings, false positives — with the change_summary texts, in the user's language) and print a 2–3 line closing summary referencing it.
 
 ## Cautions
 
 - Never touch git, in any agent. Non-negotiable.
+- The orchestrator never reviews, verifies, or fixes anything itself — all real work happens in sub-agents. Its entire visible output per iteration is the stats line + the worker's summary; verbose narration or per-finding dumps in chat are protocol violations.
 - The orchestrator must NEVER end its turn while an iteration is in flight. If a worker spawn accidentally went to the background (the Agent call returned a task id instead of the worker's final JSON), immediately block on it with repeated `TaskOutput` calls (block: true, timeout: 600000) until it completes — do not wait for a notification, it may never arrive.
 - The counterpoint CLI needs the Codex CLI installed (`npm install -g @openai/codex`); if missing, the sub-agent reports `error_kind: "codex-missing"` and the loop stops.
 - The CLI must never run inside a sandboxed Bash call — Codex needs network and its own sandbox. Sub-agents run it with `dangerouslyDisableSandbox: true`; a silently vanishing background process is the signature of a sandboxed launch.
