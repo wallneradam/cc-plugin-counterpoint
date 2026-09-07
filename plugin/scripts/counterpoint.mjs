@@ -7,6 +7,9 @@ import {
   hasReviewed,
   isAutoConsult,
   setAutoConsult,
+  findCodexBin,
+  detectBestModel,
+  DEFAULT_EFFORT,
   VALID_EFFORTS,
 } from "../lib/codex-session.mjs";
 import { composeReviewRequest } from "../lib/git-scope.mjs";
@@ -19,6 +22,10 @@ function status() {
     console.log("No active counterpoint thread.");
   }
   console.log(`Auto-consult: ${isAutoConsult() ? "ON" : "off"}`);
+  const codexBin = findCodexBin();
+  const model = codexBin ? detectBestModel(codexBin) : null;
+  console.log(`Model: ${model || "Codex config default (catalog unavailable)"}`);
+  console.log(`Default reasoning effort: ${DEFAULT_EFFORT}`);
 }
 
 async function main() {

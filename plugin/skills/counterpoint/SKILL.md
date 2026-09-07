@@ -68,7 +68,7 @@ Pass `effort` to control how deeply Codex thinks:
 | `high`   | Architecture-level decisions, security-critical design, complex trade-offs |
 | `xhigh`  | Foundational decisions that are very hard to reverse later                 |
 
-`medium` is the minimum. If unsure, omit `effort` and let Codex use its default.
+`medium` is the minimum and the default — if unsure, omit `effort`.
 
 ## Multi-round debate is the point
 

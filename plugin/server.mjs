@@ -10,13 +10,16 @@ import {
   hasReviewed,
   isAutoConsult,
   setAutoConsult,
+  findCodexBin,
+  detectBestModel,
+  DEFAULT_EFFORT,
   VALID_EFFORTS,
 } from "./lib/codex-session.mjs";
 import { composeReviewRequest } from "./lib/git-scope.mjs";
 
 const effortSchema = z
   .enum([...VALID_EFFORTS])
-  .describe("Codex reasoning effort. Default is Codex's own default.")
+  .describe("Codex reasoning effort. Defaults to medium.")
   .optional();
 
 const COUNTERPOINT_NATURE = `
@@ -129,19 +132,23 @@ server.registerTool(
   "status",
   {
     title: "Counterpoint thread status",
-    description: "Report the active Codex thread ID and whether auto-consult mode is on.",
+    description: "Report the active Codex thread ID, the auto-consult mode, and the Codex model and default reasoning effort the plugin will use.",
     inputSchema: {},
   },
   async () => {
     const threadId = readThreadId();
     const autoConsult = isAutoConsult();
+    const codexBin = findCodexBin();
+    const model = codexBin ? detectBestModel(codexBin) : null;
     const lines = [
       threadId ? `Active thread: ${threadId}` : "No active counterpoint thread.",
       `Auto-consult: ${autoConsult ? "ON" : "off"}`,
+      `Model: ${model || "Codex config default (catalog unavailable)"}`,
+      `Default reasoning effort: ${DEFAULT_EFFORT}`,
     ];
     return {
       content: [{ type: "text", text: lines.join("\n") }],
-      structuredContent: { threadId, autoConsult },
+      structuredContent: { threadId, autoConsult, model, defaultEffort: DEFAULT_EFFORT },
     };
   }
 );

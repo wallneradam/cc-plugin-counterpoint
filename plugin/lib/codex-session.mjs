@@ -11,6 +11,9 @@ export const RESPONSE_FILE = path.join(DATA_DIR, `counterpoint-${SESSION_ID}-res
 export const AUTO_CONSULT_FILE = path.join(DATA_DIR, `counterpoint-${SESSION_ID}.auto-consult`);
 export const REVIEWED_FILE = path.join(DATA_DIR, `counterpoint-${SESSION_ID}.reviewed`);
 export const VALID_EFFORTS = new Set(["medium", "high", "xhigh"]);
+// Codex's own default effort comes from the user's config (often "low"), which
+// is too shallow for critique and review rounds.
+export const DEFAULT_EFFORT = "medium";
 
 const DEFAULT_TIMEOUT_MS = 900_000;
 const EFFORT_TIMEOUT_MS = { medium: 900_000, high: 1_800_000, xhigh: 3_600_000 };
@@ -173,6 +176,32 @@ export function findCodexBin() {
   return null;
 }
 
+// Codex ships a local model catalog: `priority` ranks the models (1 = best) and
+// only `visibility: "list"` entries are user-selectable. Reading it each run
+// keeps the plugin on the newest model without hardcoding a slug that ages out.
+export function detectBestModel(codexBin) {
+  const override = process.env.COUNTERPOINT_MODEL?.trim();
+  if (override) return override;
+
+  try {
+    const raw = execFileSync(codexBin, ["debug", "models"], {
+      encoding: "utf8",
+      timeout: 15_000,
+      stdio: ["ignore", "pipe", "ignore"],
+      maxBuffer: 32 * 1024 * 1024,
+    });
+    const models = JSON.parse(raw)?.models;
+    if (!Array.isArray(models)) return null;
+    const selectable = models.filter(
+      (m) => m?.slug && m.visibility === "list" && m.supported_in_api !== false
+    );
+    selectable.sort((a, b) => (a.priority ?? Infinity) - (b.priority ?? Infinity));
+    return selectable[0]?.slug ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function readThreadId() {
   try {
     return fs.readFileSync(THREAD_FILE, "utf8").trim() || null;
@@ -322,6 +351,9 @@ export async function runSession(mode, text, effort) {
     fs.writeFileSync(RESPONSE_FILE, "", "utf8");
   } catch {}
 
+  const resolvedEffort = effort || DEFAULT_EFFORT;
+  const model = detectBestModel(codexBin);
+
   const args = [];
   if (isResume) {
     // `exec resume` does not accept `--sandbox`; the config override is the
@@ -331,11 +363,12 @@ export async function runSession(mode, text, effort) {
     args.push("exec", "-", "--sandbox", "read-only");
   }
   args.push("--json", "--output-last-message", RESPONSE_FILE);
-  if (effort) {
-    args.push("-c", `model_reasoning_effort="${effort}"`);
+  args.push("-c", `model_reasoning_effort="${resolvedEffort}"`);
+  if (model) {
+    args.push("-c", `model="${model}"`);
   }
 
-  const timeoutMs = timeoutForEffort(effort);
+  const timeoutMs = timeoutForEffort(resolvedEffort);
 
   let result;
   let fallbackFresh = false;
@@ -358,7 +391,8 @@ export async function runSession(mode, text, effort) {
       "exec", "-",
       "--json", "--sandbox", "read-only",
       "--output-last-message", RESPONSE_FILE,
-      ...(effort ? ["-c", `model_reasoning_effort="${effort}"`] : []),
+      "-c", `model_reasoning_effort="${resolvedEffort}"`,
+      ...(model ? ["-c", `model="${model}"`] : []),
     ];
     fallbackFresh = true;
     result = await runCodex(codexBin, freshArgs, preamble.initial + text, timeoutMs);
@@ -382,5 +416,11 @@ export async function runSession(mode, text, effort) {
     markReviewed();
   }
 
-  return { response, threadId: result.threadId || existingThread, resumed: isResume };
+  return {
+    response,
+    threadId: result.threadId || existingThread,
+    resumed: isResume,
+    model,
+    effort: resolvedEffort,
+  };
 }

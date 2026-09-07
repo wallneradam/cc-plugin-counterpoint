@@ -101,7 +101,13 @@ Control how deeply Codex thinks. Choose based on decision weight:
 | `high`   | Architecture-level decisions, security-critical design   |
 | `xhigh`  | Foundational decisions that are very hard to reverse     |
 
-`medium` is the minimum accepted level.
+`medium` is the minimum accepted level, and the default when `--effort` is omitted.
+
+## Model selection
+
+Before every round the plugin reads Codex's own model catalog (`codex debug models`) and picks the highest-ranked selectable model, so it follows the Codex CLI as new models ship — no model slug is hardcoded. `counterpoint.mjs status` prints the model that will be used.
+
+Set `COUNTERPOINT_MODEL=<slug>` to pin a specific model instead. If the catalog cannot be read, the model configured in `~/.codex/config.toml` applies.
 
 ## Session persistence
 
